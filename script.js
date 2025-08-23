@@ -195,12 +195,7 @@ class BikeJJGame {
         
         this.gameState = 'playing';
         
-        // Log das configurações do jogo
-        console.log(`🎮 INICIANDO JOGO - Configurações:`);
-        console.log(`   Max Energy: ${this.maxEnergy} (tipo: ${typeof this.maxEnergy})`);
-        console.log(`   Taxa de Ganho: ${this.energyGainRate} (tipo: ${typeof this.energyGainRate})`);
-        console.log(`   Taxa de Decaimento: ${this.energyDecayRate} (tipo: ${typeof this.energyDecayRate})`);
-        console.log(`   Game State: ${this.gameState}`);
+
         
         // Iniciar relatório da partida atual
         this.startGameReport();
@@ -210,7 +205,7 @@ class BikeJJGame {
             player.energy = 0;
             player.score = 0;
             player.isPedaling = false;
-            console.log(`   Jogador ${player.id}: Energia inicializada para ${player.energy}`);
+
         });
         
         document.getElementById('startBtn').disabled = true;
@@ -275,12 +270,12 @@ class BikeJJGame {
         player.score += 0.5 + energyBonus; // Reduzido o ganho base
         
         console.log(`⚡ Jogador ${player.id}: Energia ${oldEnergy.toFixed(3)} → ${player.energy.toFixed(3)}/${this.maxEnergy}, Pontuação: ${player.score.toFixed(2)}`);
-        console.log(`🔍 Taxa de ganho: ${this.energyGainRate}, Max Energy: ${this.maxEnergy}`);
+
         
         // Verificar se atingiu energia máxima
         if (player.energy >= this.maxEnergy) {
             console.log(`🏆 VITÓRIA IMEDIATA! Jogador ${player.id} atingiu energia máxima!`);
-            console.log(`🔍 Energia final: ${player.energy.toFixed(3)}, Max: ${this.maxEnergy}`);
+
             this.endGameWithWinner(player);
             return;
         }
@@ -317,18 +312,13 @@ class BikeJJGame {
         const now = Date.now();
         
         this.players.forEach(player => {
-            // Debug: mostrar energia atual a cada frame
-            if (player.energy > 95) {
-                console.log(`🚨 ALERTA ALTO! Jogador ${player.id}: ${player.energy.toFixed(3)}/${this.maxEnergy}`);
-            }
+            
             
             // Decaimento natural da energia
             if (!player.isPedaling) {
                 const oldEnergy = player.energy;
                 player.energy = Math.max(0, player.energy - (this.energyDecayRate / 60));
-                if (oldEnergy !== player.energy) {
-                    console.log(`📉 Jogador ${player.id}: Decaimento ${oldEnergy.toFixed(3)} → ${player.energy.toFixed(3)}`);
-                }
+                
             }
             
             // Atualizar pontuação baseada na energia constante
@@ -339,16 +329,12 @@ class BikeJJGame {
             // Verificar se algum jogador atingiu energia máxima (vitória instantânea)
             if (player.energy >= this.maxEnergy) {
                 console.log(`🏆 VITÓRIA! Jogador ${player.id} atingiu energia máxima: ${player.energy.toFixed(3)}/${this.maxEnergy}`);
-                console.log(`🔍 Tipo de energia: ${typeof player.energy}, Tipo de maxEnergy: ${typeof this.maxEnergy}`);
-                console.log(`🔍 Comparação: ${player.energy} >= ${this.maxEnergy} = ${player.energy >= this.maxEnergy}`);
+                
                 this.endGameWithWinner(player);
                 return;
             }
             
-            // Debug: mostrar energia atual
-            if (player.energy > 90) {
-                console.log(`⚠️ Jogador ${player.id} com energia alta: ${player.energy.toFixed(3)}/${this.maxEnergy}`);
-            }
+
         });
         
         // Atualizar relatório em tempo real

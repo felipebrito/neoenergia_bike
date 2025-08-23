@@ -204,11 +204,7 @@ npx serve .
 - **Evite abrir index.html diretamente** (problemas de persistência)
 - **Porta 8001** é a padrão configurada
 
-### **🪟 Problemas Específicos do Windows:**
-- **Debug disponível**: Acesse `/test_windows_debug.html` para testes específicos
-- **Logs detalhados**: Console do navegador mostra informações de debug
-- **Precisão float**: Teste de precisão numérica para identificar problemas
-- **UDP**: Verifique se as mensagens estão sendo enviadas corretamente
+
 
 ---
 
