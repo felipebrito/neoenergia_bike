@@ -478,6 +478,26 @@ body::before {
     box-shadow: 0 8px 25px rgba(40, 167, 69, 0.6);
 }
 
+.reset-btn {
+    padding: 0.75rem 1.5rem;
+    background: linear-gradient(45deg, #dc3545, #c82333);
+    color: white;
+    border: none;
+    border-radius: 10px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    box-shadow: 0 4px 15px rgba(220, 53, 69, 0.4);
+}
+
+.reset-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(220, 53, 69, 0.6);
+}
+
 /* Loading Overlay */
 .loading-overlay {
     position: fixed;

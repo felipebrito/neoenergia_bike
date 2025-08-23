@@ -176,6 +176,7 @@ BikeJJ/
 - **Tema**: Dark mode consistente com o jogo
 - **Gráficos**: Chart.js para visualização de dados
 - **Animações**: GSAP para transições suaves
+- **Funcionalidades**: Filtros, exportação e reset completo
 
 ### **🌐 Opção 1: Servidor Python (Recomendado)**
 ```bash

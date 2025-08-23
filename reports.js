@@ -52,6 +52,11 @@ class BikeJJReports {
             this.exportData();
         });
         
+        // Botão de reset do dashboard
+        document.getElementById('resetDashboardBtn').addEventListener('click', () => {
+            this.resetDashboard();
+        });
+        
         // Controles de gráfico
         document.querySelectorAll('.chart-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
@@ -591,6 +596,62 @@ class BikeJJReports {
                 link.click();
                 this.showNotification('📊 Dados exportados com sucesso!');
             }
+        });
+    }
+    
+    // Resetar dashboard
+    resetDashboard() {
+        // Confirmar ação
+        if (!confirm('⚠️ Tem certeza que deseja resetar o dashboard?\n\nEsta ação irá:\n• Limpar todos os relatórios\n• Resetar todas as estatísticas\n• Não pode ser desfeita\n\nDigite "RESET" para confirmar:')) {
+            return;
+        }
+        
+        const confirmation = prompt('Digite "RESET" para confirmar:');
+        if (confirmation !== 'RESET') {
+            this.showNotification('❌ Reset cancelado');
+            return;
+        }
+        
+        // Animar botão
+        gsap.to('#resetDashboardBtn', {
+            scale: 1.1,
+            duration: 0.2,
+            yoyo: true,
+            repeat: 1
+        });
+        
+        // Limpar dados
+        this.gameReports = [];
+        localStorage.removeItem('bikejj_game_reports');
+        
+        // Resetar gráficos
+        this.resetCharts();
+        
+        // Re-renderizar dashboard
+        this.renderDashboard();
+        
+        // Mostrar notificação
+        this.showNotification('🗑️ Dashboard resetado com sucesso!');
+        
+        console.log('🔄 Dashboard resetado - todos os dados foram limpos');
+    }
+    
+    // Resetar gráficos
+    resetCharts() {
+        // Destruir gráficos existentes
+        Object.values(this.charts).forEach(chart => {
+            if (chart && typeof chart.destroy === 'function') {
+                chart.destroy();
+            }
+        });
+        
+        this.charts = {};
+        
+        // Limpar canvas
+        const canvases = document.querySelectorAll('canvas');
+        canvases.forEach(canvas => {
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
         });
     }
     
