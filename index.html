@@ -8,6 +8,10 @@
 </head>
 <body>
     <div class="container">
+        <!-- Linhas de scan interativas -->
+        <div class="scan-line horizontal"></div>
+        <div class="scan-line vertical"></div>
+        
         <header>
             <h1>🚴 BikeJJ</h1>
             <p>Competição de Energia com Bicicletas</p>
@@ -131,6 +135,12 @@
                     <span class="config-value" id="energyDecayValue">2.5%</span>
                 </div>
                 
+                <div class="config-group">
+                    <label for="ledStrobeRate">Taxa de Piscagem LED (ms):</label>
+                    <input type="range" id="ledStrobeRate" min="50" max="1000" step="50" value="200">
+                    <span class="config-value" id="ledStrobeValue">200ms</span>
+                </div>
+                
                 <div class="config-buttons">
                     <button id="applyConfig" class="btn btn-primary">Aplicar e Salvar</button>
                     <button id="closeConfig" class="btn btn-secondary">Fechar</button>
@@ -149,6 +159,16 @@
                 <p>🔄 Nova partida em <span id="restartCountdown">10</span>s</p>
             </div>
             <button id="newGameBtn" class="btn btn-primary">Reiniciar Agora</button>
+        </div>
+    </div>
+
+    <!-- LEDs Virtuais -->
+    <div class="virtual-leds">
+        <div class="led-panel">
+            <div class="led" id="led1" data-player="1"></div>
+            <div class="led" id="led2" data-player="2"></div>
+            <div class="led" id="led3" data-player="3"></div>
+            <div class="led" id="led4" data-player="4"></div>
         </div>
     </div>
 

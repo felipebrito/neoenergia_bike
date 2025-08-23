@@ -6,15 +6,121 @@
 
 body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: #000000;
     min-height: 100vh;
-    color: #333;
+    color: #ffffff;
+    position: relative;
+    overflow-x: hidden;
 }
+
+/* Efeito de fundo animado */
+body::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: 
+        radial-gradient(circle at 20% 80%, rgba(120, 119, 198, 0.1) 0%, transparent 50%),
+        radial-gradient(circle at 80% 20%, rgba(255, 119, 198, 0.1) 0%, transparent 50%),
+        radial-gradient(circle at 40% 40%, rgba(120, 198, 119, 0.1) 0%, transparent 50%);
+    animation: backgroundShift 20s ease-in-out infinite;
+    z-index: -1;
+}
+
+@keyframes backgroundShift {
+    0%, 100% { opacity: 0.3; transform: scale(1); }
+    50% { opacity: 0.6; transform: scale(1.1); }
+}
+
+/* Efeitos de scan interativos - Orientação de baixo para cima */
+.scan-line {
+    position: absolute;
+    width: 100%;
+    height: 4px;
+    background: linear-gradient(90deg, transparent, #00ffff, #ff00ff, #00ffff, transparent);
+    opacity: 0;
+    z-index: 10;
+    pointer-events: none;
+    border-radius: 2px;
+    box-shadow: 0 0 10px rgba(0, 255, 255, 0.8);
+}
+
+.scan-line.horizontal {
+    animation: scanHorizontal 6s linear infinite;
+}
+
+.scan-line.vertical {
+    width: 4px;
+    height: 100%;
+    background: linear-gradient(180deg, transparent, #00ffff, #ff00ff, #00ffff, transparent);
+    animation: scanVertical 8s linear infinite;
+    border-radius: 2px;
+    box-shadow: 0 0 10px rgba(0, 255, 255, 0.8);
+}
+
+@keyframes scanHorizontal {
+    0% { 
+        transform: translateX(-100%); 
+        opacity: 0; 
+    }
+    15% { 
+        opacity: 1; 
+    }
+    85% { 
+        opacity: 1; 
+    }
+    100% { 
+        transform: translateX(100%); 
+        opacity: 0; 
+    }
+}
+
+@keyframes scanVertical {
+    0% { 
+        transform: translateY(100%); 
+        opacity: 0; 
+    }
+    15% { 
+        opacity: 1; 
+    }
+    85% { 
+        opacity: 1; 
+    }
+    100% { 
+        transform: translateY(-100%); 
+        opacity: 0; 
+    }
+}
+
+/* Efeito de brilho nas barras - Orientação de baixo para cima */
+.player-bar::after {
+    content: '';
+    position: absolute;
+    bottom: -100%;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(180deg, transparent, rgba(0, 255, 255, 0.3), rgba(255, 255, 255, 0.4), rgba(0, 255, 255, 0.3), transparent);
+    animation: barShine 12s linear infinite;
+    pointer-events: none;
+    border-radius: 20px;
+}
+
+@keyframes barShine {
+    0% { bottom: -100%; }
+    100% { bottom: 100%; }
+}
+
+
 
 .container {
     max-width: 1200px;
     margin: 0 auto;
     padding: 20px;
+    position: relative;
+    z-index: 1;
 }
 
 header {
@@ -26,7 +132,12 @@ header {
 header h1 {
     font-size: 3rem;
     margin-bottom: 10px;
-    text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+    background: linear-gradient(45deg, #FF6B6B, #4ECDC4);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    text-shadow: 0 0 30px rgba(255, 107, 107, 0.5);
+    filter: drop-shadow(0 0 20px rgba(255, 107, 107, 0.3));
 }
 
 header p {
@@ -38,12 +149,13 @@ header p {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    background: rgba(255,255,255,0.1);
+    background: rgba(44, 62, 80, 0.3);
     padding: 20px;
     border-radius: 15px;
     margin-bottom: 30px;
     backdrop-filter: blur(10px);
-    border: 1px solid rgba(255,255,255,0.2);
+    border: 1px solid rgba(255,255,255,0.1);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
 }
 
 .controls-info {
@@ -72,11 +184,13 @@ header p {
 }
 
 .player-bar {
-    background: rgba(255,255,255,0.95);
+    background: rgba(44, 62, 80, 0.95);
     border-radius: 20px;
     padding: 20px;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+    box-shadow: 0 10px 30px rgba(0,0,0,0.4);
     transition: transform 0.3s ease, box-shadow 0.3s ease;
+    position: relative;
+    overflow: hidden;
 }
 
 .player-bar:hover {
@@ -99,7 +213,7 @@ header p {
 .player-name {
     font-size: 1.2rem;
     font-weight: bold;
-    color: #333;
+    color: #ffffff;
 }
 
 .player-score {
@@ -114,11 +228,11 @@ header p {
 .energy-bar {
     position: relative;
     height: 300px;
-    background: #f0f0f0;
+    background: #1a1a1a;
     border-radius: 15px;
     overflow: hidden;
     margin-bottom: 15px;
-    border: 3px solid #333;
+    border: 3px solid #404040;
 }
 
 .energy-fill {
@@ -143,21 +257,21 @@ header p {
 
 .segment {
     height: 14.28%;
-    border-bottom: 2px solid rgba(255,255,255,0.8);
+    border-bottom: 2px solid rgba(255,255,255,0.3);
 }
 
-.segment.red { background: rgba(255, 0, 0, 0.1); }
-.segment.orange { background: rgba(255, 128, 0, 0.1); }
-.segment.yellow { background: rgba(255, 255, 0, 0.1); }
-.segment.light-green { background: rgba(128, 255, 0, 0.1); }
-.segment.green { background: rgba(0, 255, 0, 0.1); }
-.segment.light-blue { background: rgba(0, 255, 255, 0.1); }
-.segment.blue { background: rgba(0, 128, 255, 0.1); }
+.segment.red { background: rgba(255, 0, 0, 0.2); }
+.segment.orange { background: rgba(255, 128, 0, 0.2); }
+.segment.yellow { background: rgba(255, 255, 0, 0.2); }
+.segment.light-green { background: rgba(128, 255, 0, 0.2); }
+.segment.green { background: rgba(0, 255, 0, 0.2); }
+.segment.light-blue { background: rgba(0, 255, 255, 0.2); }
+.segment.blue { background: rgba(0, 128, 255, 0.2); }
 
 .player-status {
     text-align: center;
     font-weight: bold;
-    color: #666;
+    color: #cccccc;
     font-size: 1rem;
 }
 
@@ -188,6 +302,7 @@ header p {
     background: linear-gradient(45deg, #4CAF50, #45a049);
     color: white;
     box-shadow: 0 5px 15px rgba(76, 175, 80, 0.4);
+    border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .btn-primary:hover {
@@ -210,6 +325,7 @@ header p {
     background: linear-gradient(45deg, #9C27B0, #673AB7);
     color: white;
     box-shadow: 0 5px 15px rgba(156, 39, 176, 0.4);
+    border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .btn-config:hover {
@@ -541,20 +657,21 @@ header p {
 }
 
 .config-content {
-    background: white;
+    background: rgba(44, 62, 80, 0.95);
     padding: 30px;
     border-radius: 20px;
-    box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
     max-width: 500px;
     width: 90%;
     max-height: 80vh;
     overflow-y: auto;
+    border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .config-content h3 {
     text-align: center;
     margin-bottom: 25px;
-    color: #333;
+    color: #ffffff;
     font-size: 1.5rem;
 }
 
@@ -566,7 +683,7 @@ header p {
     display: block;
     margin-bottom: 8px;
     font-weight: bold;
-    color: #555;
+    color: #cccccc;
 }
 
 .config-group input[type="range"] {
@@ -655,4 +772,120 @@ header p {
 @keyframes sparkle {
     0%, 100% { opacity: 0.3; }
     50% { opacity: 0.8; }
+}
+
+/* LEDs Virtuais */
+.virtual-leds {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    z-index: 1000;
+    background: rgba(0, 0, 0, 0.9);
+    border-radius: 15px;
+    padding: 15px;
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+.led-panel {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+}
+
+.led {
+    width: 50px;
+    height: 50px;
+    background: #1a1a1a;
+    border: 2px solid #333;
+    border-radius: 8px;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+    cursor: pointer;
+}
+
+.led:hover {
+    border-color: #555;
+    transform: scale(1.05);
+}
+
+
+
+.led.active {
+    background: #fff;
+    border-color: #fff;
+    box-shadow: 0 0 20px rgba(255, 255, 255, 0.8);
+}
+
+
+
+/* Efeito Strobe */
+.led.strobe {
+    animation: strobeEffect var(--strobe-rate, 200ms) infinite;
+}
+
+@keyframes strobeEffect {
+    0%, 50% {
+        background: #fff;
+        border-color: #fff;
+        box-shadow: 0 0 30px rgba(255, 255, 255, 1);
+    }
+    51%, 100% {
+        background: #1a1a1a;
+        border-color: #333;
+        box-shadow: none;
+    }
+}
+
+/* Cores por jogador */
+.led[data-player="1"] {
+    border-color: #FF6B6B;
+}
+
+.led[data-player="2"] {
+    border-color: #4ECDC4;
+}
+
+.led[data-player="3"] {
+    border-color: #45B7D1;
+}
+
+.led[data-player="4"] {
+    border-color: #96CEB4;
+}
+
+.led[data-player="1"].active {
+    background: #FF6B6B;
+}
+
+.led[data-player="2"].active {
+    background: #4ECDC4;
+}
+
+.led[data-player="3"].active {
+    background: #45B7D1;
+}
+
+.led[data-player="4"].active {
+    background: #96CEB4;
+}
+
+/* LEDs Responsivos */
+@media (max-width: 480px) {
+    .virtual-leds {
+        bottom: 10px;
+        right: 10px;
+        padding: 10px;
+    }
+    
+    .led {
+        width: 40px;
+        height: 40px;
+    }
+    
+
 }

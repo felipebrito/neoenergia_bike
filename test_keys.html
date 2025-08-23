@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste de Teclas - BikeJJ</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background: #f0f0f0;
+        }
+        .test-area {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+        .key-status {
+            display: inline-block;
+            width: 100px;
+            height: 50px;
+            margin: 10px;
+            border: 2px solid #ccc;
+            border-radius: 5px;
+            text-align: center;
+            line-height: 50px;
+            font-weight: bold;
+        }
+        .key-status.active {
+            background: #4CAF50;
+            color: white;
+            border-color: #4CAF50;
+        }
+        .log {
+            background: #333;
+            color: #0f0;
+            padding: 10px;
+            border-radius: 5px;
+            font-family: monospace;
+            height: 200px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔑 Teste de Teclas - BikeJJ</h1>
+    
+    <div class="test-area">
+        <h3>Status das Teclas:</h3>
+        <div class="key-status" id="keyQ">Q</div>
+        <div class="key-status" id="keyW">W</div>
+        <div class="key-status" id="keyE">E</div>
+        <div class="key-status" id="keyR">R</div>
+    </div>
+    
+    <div class="test-area">
+        <h3>Log de Eventos:</h3>
+        <div class="log" id="log"></div>
+    </div>
+    
+    <div class="test-area">
+        <h3>Instruções:</h3>
+        <ul>
+            <li>Pressione as teclas Q, W, E, R para testar</li>
+            <li>Verifique se os logs aparecem no console</li>
+            <li>As teclas devem ficar verdes quando pressionadas</li>
+        </ul>
+    </div>
+
+    <script>
+        const log = document.getElementById('log');
+        
+        function addLog(message) {
+            const timestamp = new Date().toLocaleTimeString();
+            log.innerHTML += `[${timestamp}] ${message}\n`;
+            log.scrollTop = log.scrollHeight;
+            console.log(message);
+        }
+        
+        function updateKeyStatus(key, isActive) {
+            const keyElement = document.getElementById(`key${key}`);
+            if (keyElement) {
+                keyElement.classList.toggle('active', isActive);
+            }
+        }
+        
+        // Event listeners para as teclas
+        document.addEventListener('keydown', (e) => {
+            const key = e.code.replace('Key', '');
+            if (['Q', 'W', 'E', 'R'].includes(key)) {
+                e.preventDefault();
+                updateKeyStatus(key, true);
+                addLog(`🔑 Tecla ${key} PRESSIONADA`);
+            }
+        });
+        
+        document.addEventListener('keyup', (e) => {
+            const key = e.code.replace('Key', '');
+            if (['Q', 'W', 'E', 'R'].includes(key)) {
+                updateKeyStatus(key, false);
+                addLog(`🔑 Tecla ${key} SOLTA`);
+            }
+        });
+        
+        addLog('🚀 Teste de teclas iniciado. Pressione Q, W, E, R para testar.');
+    </script>
+</body>
+</html>

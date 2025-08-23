@@ -171,6 +171,12 @@ BikeJJ/
 - Python 3.x (para servidor local)
 - Suporte a CSS Grid e ES6+
 
+### **📊 Dashboard de Relatórios:**
+- **Acesso**: http://localhost:8000/reports.html
+- **Tema**: Dark mode consistente com o jogo
+- **Gráficos**: Chart.js para visualização de dados
+- **Animações**: GSAP para transições suaves
+
 ### **🌐 Opção 1: Servidor Python (Recomendado)**
 ```bash
 # No diretório do projeto
@@ -202,10 +208,11 @@ npx serve .
 ## 🎨 Características Visuais
 
 ### **🎨 Design da Interface:**
-- **Gradientes**: Fundo azul-roxo moderno
+- **Tema Dark**: Fundo preto com gradientes sutis
 - **Barras**: 7 segmentos coloridos (vermelho ao azul)
 - **Sombras**: Efeitos de profundidade e modernidade
 - **Tipografia**: Fontes legíveis e hierarquia clara
+- **Efeitos de Scan**: Linhas horizontais e verticais animadas
 
 ### **🏆 Efeitos de Vitória (Tipo Cassino):**
 - **Glow Colorido**: Borda que alterna entre cores

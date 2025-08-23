@@ -7,7 +7,8 @@ class BikeJJGame {
         // Configurações padrão
         this.defaultConfig = {
             energyDecayRate: 2.5,
-            energyGainRate: 3
+            energyGainRate: 3,
+            ledStrobeRate: 200
         };
         
         // Carregar configurações salvas ou usar padrões
@@ -26,17 +27,34 @@ class BikeJJGame {
             { id: 4, key: 'KeyR', energy: 0, score: 0, isPedaling: false, lastPedalTime: 0 }
         ];
         
+        // Sistema de LEDs virtuais
+        this.virtualLeds = {
+            elements: {},
+            strobeTimers: {},
+            isStrobing: false,
+            currentWinner: null
+        };
+        
         this.init();
     }
     
     init() {
+        console.log('🚀 Inicializando BikeJJ Game...');
+        console.log('👥 Players configurados:', this.players);
+        
         this.setupEventListeners();
         this.setupGameLoop();
         this.loadGameReports(); // Carregar relatórios salvos
+        this.setupVirtualLeds(); // Configurar LEDs virtuais
         this.updateDisplay();
+        
+        console.log('✅ BikeJJ Game inicializado com sucesso!');
+        console.log('🎮 Estado inicial:', this.gameState);
     }
     
     setupEventListeners() {
+        console.log('🔧 Configurando event listeners...');
+        
         // Controles do jogo
         document.getElementById('startBtn').addEventListener('click', () => this.startGame());
         document.getElementById('resetBtn').addEventListener('click', () => this.resetGame());
@@ -47,8 +65,6 @@ class BikeJJGame {
         document.getElementById('closeConfig').addEventListener('click', () => this.hideConfigMenu());
         document.getElementById('applyConfig').addEventListener('click', () => this.applyConfig());
         document.getElementById('resetConfig').addEventListener('click', () => this.resetConfig());
-        
-
         
         // Eventos dos sliders de configuração
         this.setupConfigSliders();
@@ -63,6 +79,106 @@ class BikeJJGame {
                 e.preventDefault();
             }
         });
+        
+        console.log('✅ Event listeners configurados com sucesso!');
+    }
+    
+    // Configurar LEDs virtuais
+    setupVirtualLeds() {
+        // Obter elementos dos LEDs
+        for (let i = 1; i <= 4; i++) {
+            this.virtualLeds.elements[i] = document.getElementById(`led${i}`);
+        }
+        
+        // Aplicar taxa de strobe inicial
+        this.updateStrobeRate();
+        
+        // Event listeners para teste manual (opcional)
+        Object.values(this.virtualLeds.elements).forEach(led => {
+            led.addEventListener('click', () => {
+                const playerId = parseInt(led.dataset.player);
+                this.testLedStrobe(playerId);
+            });
+        });
+    }
+    
+    // Atualizar taxa de strobe nos LEDs
+    updateStrobeRate() {
+        const rate = this.ledStrobeRate || 200;
+        document.documentElement.style.setProperty('--strobe-rate', `${rate}ms`);
+    }
+    
+    // Ativar LED do vencedor com strobe
+    activateWinnerLed(playerId) {
+        // Resetar todos os LEDs
+        this.resetAllLeds();
+        
+        const led = this.virtualLeds.elements[playerId];
+        if (led) {
+            // Ativar LED do vencedor
+            led.classList.add('active', 'strobe');
+            this.virtualLeds.isStrobing = true;
+            this.virtualLeds.currentWinner = playerId;
+            
+            console.log(`🔴 LED do Jogador ${playerId} ativado com strobe`);
+        }
+    }
+    
+    // Resetar todos os LEDs
+    resetAllLeds() {
+        Object.values(this.virtualLeds.elements).forEach(led => {
+            led.classList.remove('active', 'strobe');
+        });
+        
+        // Limpar timers de strobe
+        Object.values(this.virtualLeds.strobeTimers).forEach(timer => {
+            clearInterval(timer);
+        });
+        
+        this.virtualLeds.strobeTimers = {};
+        this.virtualLeds.isStrobing = false;
+        this.virtualLeds.currentWinner = null;
+        
+        console.log('🔴 Todos os LEDs resetados');
+    }
+    
+    // Teste manual de strobe (desenvolvimento)
+    testLedStrobe(playerId) {
+        if (this.gameState === 'waiting') {
+            this.activateWinnerLed(playerId);
+            
+            // Auto-reset após 3 segundos
+            setTimeout(() => {
+                this.resetAllLeds();
+            }, 3000);
+        }
+    }
+    
+    // Enviar dados via UDP
+    async sendUDPData(type, playerId = 0) {
+        try {
+            const data = {
+                type: type,
+                player_id: playerId,
+                timestamp: Date.now()
+            };
+            
+            const response = await fetch('/api/udp', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(data)
+            });
+            
+            if (response.ok) {
+                console.log(`📡 UDP enviado: ${type} - Jogador ${playerId}`);
+            } else {
+                console.error('❌ Erro ao enviar UDP:', response.statusText);
+            }
+        } catch (error) {
+            console.error('❌ Erro na comunicação UDP:', error);
+        }
     }
     
     setupGameLoop() {
@@ -97,11 +213,19 @@ class BikeJJGame {
     }
     
     handleKeyDown(e) {
-        if (this.gameState !== 'playing') return;
+        console.log('🔑 Tecla pressionada:', e.code, 'Game State:', this.gameState);
+        
+        if (this.gameState !== 'playing') {
+            console.log('❌ Jogo não está rodando');
+            return;
+        }
         
         const player = this.players.find(p => p.key === e.code);
         if (player) {
+            console.log('✅ Jogador encontrado:', player.id);
             this.pedal(player.id);
+        } else {
+            console.log('❌ Jogador não encontrado para tecla:', e.code);
         }
     }
     
@@ -115,13 +239,21 @@ class BikeJJGame {
     }
     
     pedal(playerId) {
+        console.log('🚴 Pedalando jogador:', playerId);
+        
         const player = this.players.find(p => p.id === playerId);
-        if (!player) return;
+        if (!player) {
+            console.log('❌ Jogador não encontrado:', playerId);
+            return;
+        }
         
         const now = Date.now();
         
         // Evitar spam de inputs (mínimo 50ms entre inputs)
-        if (now - player.lastPedalTime < 50) return;
+        if (now - player.lastPedalTime < 50) {
+            console.log('⏱️ Muito rápido, ignorando input');
+            return;
+        }
         
         player.lastPedalTime = now;
         player.isPedaling = true;
@@ -133,9 +265,9 @@ class BikeJJGame {
         const energyBonus = Math.floor(player.energy / 20); // Reduzido o bônus
         player.score += 0.5 + energyBonus; // Reduzido o ganho base
         
-        // Registrar evento de pedalada no relatório
-        this.recordPedalEvent(playerId, player.energy);
+        console.log('⚡ Energia atual:', player.energy, 'Pontuação:', player.score);
         
+        // Registrar evento de pedalada no relatório
         this.updateDisplay();
     }
     
@@ -254,6 +386,12 @@ class BikeJJGame {
         
         // Marcar todos os outros jogadores como perdedores
         this.markLosers(winner.id);
+        
+        // Ativar LED do vencedor com strobe
+        this.activateWinnerLed(winner.id);
+        
+        // Enviar dados do vencedor via UDP
+        this.sendUDPData('winner', winner.id);
         
         // Mostrar botão de nova partida
         document.getElementById('newGameButton').style.display = 'block';
@@ -702,6 +840,12 @@ class BikeJJGame {
             this.autoRestartTimer = null;
         }
         
+        // Resetar LEDs virtuais
+        this.resetAllLeds();
+        
+        // Enviar sinal de reset via UDP
+        this.sendUDPData('reset', 0);
+        
         document.getElementById('newGameButton').style.display = 'none';
         this.removeWinnerEffects();
         this.resetGame();
@@ -763,6 +907,10 @@ class BikeJJGame {
         document.getElementById('energyDecayRate').addEventListener('input', (e) => {
             document.getElementById('energyDecayValue').textContent = e.target.value + '%';
         });
+        
+        document.getElementById('ledStrobeRate').addEventListener('input', (e) => {
+            document.getElementById('ledStrobeValue').textContent = e.target.value + 'ms';
+        });
     }
     
     updateConfigDisplay() {
@@ -772,12 +920,19 @@ class BikeJJGame {
         
         document.getElementById('energyDecayRate').value = this.energyDecayRate;
         document.getElementById('energyDecayValue').textContent = this.energyDecayRate + '%';
+        
+        document.getElementById('ledStrobeRate').value = this.ledStrobeRate;
+        document.getElementById('ledStrobeValue').textContent = this.ledStrobeRate + 'ms';
     }
     
     applyConfig() {
         // Aplicar novas configurações
         this.energyGainRate = parseFloat(document.getElementById('energyGainRate').value);
         this.energyDecayRate = parseFloat(document.getElementById('energyDecayRate').value);
+        this.ledStrobeRate = parseInt(document.getElementById('ledStrobeRate').value);
+        
+        // Atualizar taxa de strobe dos LEDs
+        this.updateStrobeRate();
         
         // Salvar configurações automaticamente
         this.saveConfig();
@@ -795,6 +950,10 @@ class BikeJJGame {
         // Restaurar configurações padrão
         this.energyGainRate = this.defaultConfig.energyGainRate;
         this.energyDecayRate = this.defaultConfig.energyDecayRate;
+        this.ledStrobeRate = this.defaultConfig.ledStrobeRate;
+        
+        // Atualizar taxa de strobe dos LEDs
+        this.updateStrobeRate();
         
         // Salvar configurações padrão
         this.saveConfig();
@@ -809,6 +968,7 @@ class BikeJJGame {
             const config = {
                 energyGainRate: this.energyGainRate,
                 energyDecayRate: this.energyDecayRate,
+                ledStrobeRate: this.ledStrobeRate,
                 timestamp: Date.now()
             };
             localStorage.setItem('bikejj_config', JSON.stringify(config));
@@ -828,6 +988,7 @@ class BikeJJGame {
                 if (config.energyGainRate && config.energyDecayRate) {
                     this.energyGainRate = config.energyGainRate;
                     this.energyDecayRate = config.energyDecayRate;
+                    this.ledStrobeRate = config.ledStrobeRate || this.defaultConfig.ledStrobeRate;
                     console.log('⚙️ Configurações carregadas:', config);
                 } else {
                     console.log('⚠️ Configurações inválidas, usando padrões');
@@ -846,6 +1007,7 @@ class BikeJJGame {
     useDefaultConfig() {
         this.energyGainRate = this.defaultConfig.energyGainRate;
         this.energyDecayRate = this.defaultConfig.energyDecayRate;
+        this.ledStrobeRate = this.defaultConfig.ledStrobeRate;
     }
     
     updateConfigStatus() {
