@@ -15,7 +15,7 @@ import time
 from urllib.parse import urlparse
 from udp_server import start_udp_server
 
-PORT = 8000
+PORT = 8001
 
 class BikeJJHandler(http.server.SimpleHTTPRequestHandler):
     def end_headers(self):
