@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BikeJJ - Competição de Energia</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🚴 BikeJJ</h1>
+            <p>Competição de Energia com Bicicletas</p>
+        </header>
+
+        <div class="game-info">
+            <div class="controls-info">
+                <p>Controles: <strong>Q</strong> | <strong>W</strong> | <strong>E</strong> | <strong>R</strong></p>
+            </div>
+            <div class="game-objective">
+                <p>🎯 Objetivo: Primeiro a 100% de energia vence!</p>
+            </div>
+        </div>
+
+        <div class="energy-bars-container">
+            <div class="player-bar" id="player1">
+                <div class="player-label">
+                    <span class="player-name">Jogador 1</span>
+                    <span class="player-score">0</span>
+                </div>
+                <div class="energy-bar">
+                    <div class="energy-fill" id="energy1"></div>
+                    <div class="energy-segments">
+                        <div class="segment red"></div>
+                        <div class="segment orange"></div>
+                        <div class="segment yellow"></div>
+                        <div class="segment light-green"></div>
+                        <div class="segment green"></div>
+                        <div class="segment light-blue"></div>
+                        <div class="segment blue"></div>
+                    </div>
+                </div>
+                <div class="player-status" id="status1">Aguardando...</div>
+            </div>
+
+            <div class="player-bar" id="player2">
+                <div class="player-label">
+                    <span class="player-name">Jogador 2</span>
+                    <span class="player-score">0</span>
+                </div>
+                <div class="energy-bar">
+                    <div class="energy-fill" id="energy2"></div>
+                    <div class="energy-segments">
+                        <div class="segment red"></div>
+                        <div class="segment orange"></div>
+                        <div class="segment yellow"></div>
+                        <div class="segment light-green"></div>
+                        <div class="segment green"></div>
+                        <div class="segment light-blue"></div>
+                        <div class="segment blue"></div>
+                    </div>
+                </div>
+                <div class="player-status" id="status2">Aguardando...</div>
+            </div>
+
+            <div class="player-bar" id="player3">
+                <div class="player-label">
+                    <span class="player-name">Jogador 3</span>
+                    <span class="player-score">0</span>
+                </div>
+                <div class="energy-bar">
+                    <div class="energy-fill" id="energy3"></div>
+                    <div class="energy-segments">
+                        <div class="segment red"></div>
+                        <div class="segment orange"></div>
+                        <div class="segment yellow"></div>
+                        <div class="segment light-green"></div>
+                        <div class="segment green"></div>
+                        <div class="segment light-blue"></div>
+                        <div class="segment blue"></div>
+                    </div>
+                </div>
+                <div class="player-status" id="status3">Aguardando...</div>
+            </div>
+
+            <div class="player-bar" id="player4">
+                <div class="player-label">
+                    <span class="player-name">Jogador 4</span>
+                    <span class="player-score">0</span>
+                </div>
+                <div class="energy-bar">
+                    <div class="energy-fill" id="energy4"></div>
+                    <div class="energy-segments">
+                        <div class="segment red"></div>
+                        <div class="segment orange"></div>
+                        <div class="segment yellow"></div>
+                        <div class="segment light-green"></div>
+                        <div class="segment green"></div>
+                        <div class="segment light-blue"></div>
+                        <div class="segment blue"></div>
+                    </div>
+                </div>
+                <div class="player-status" id="status4">Aguardando...</div>
+            </div>
+        </div>
+
+        <div class="game-controls">
+            <button id="startBtn" class="btn btn-primary">Iniciar Jogo</button>
+            <button id="resetBtn" class="btn btn-secondary">Reiniciar</button>
+            <button id="configBtn" class="btn btn-config">⚙️ Configurações</button>
+        </div>
+
+        <!-- Menu de Configurações -->
+        <div class="config-menu" id="configMenu">
+            <div class="config-content">
+                <h3>⚙️ Configurações da Física</h3>
+                
+                <div class="config-group">
+                    <label for="energyGainRate">Taxa de Geração de Energia (% por pedalada):</label>
+                    <input type="range" id="energyGainRate" min="1" max="10" step="0.5" value="3">
+                    <span class="config-value" id="energyGainValue">3%</span>
+                </div>
+                
+                <div class="config-group">
+                    <label for="energyDecayRate">Taxa de Decaimento (% por segundo):</label>
+                    <input type="range" id="energyDecayRate" min="0.1" max="15" step="0.1" value="2.5">
+                    <span class="config-value" id="energyDecayValue">2.5%</span>
+                </div>
+                
+                <div class="config-buttons">
+                    <button id="applyConfig" class="btn btn-primary">Aplicar e Salvar</button>
+                    <button id="closeConfig" class="btn btn-secondary">Fechar</button>
+                    <button id="resetConfig" class="btn btn-reset">🔄 Padrão</button>
+                </div>
+                
+                <div class="config-status" id="configStatus">
+                    <p>✅ Configurações salvas automaticamente</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Botão de nova partida -->
+        <div class="new-game-button" id="newGameButton" style="display: none;">
+            <div class="auto-restart-info">
+                <p>🔄 Nova partida em <span id="restartCountdown">10</span>s</p>
+            </div>
+            <button id="newGameBtn" class="btn btn-primary">Reiniciar Agora</button>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

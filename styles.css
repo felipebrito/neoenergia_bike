@@ -1,0 +1,631 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    min-height: 100vh;
+    color: #333;
+}
+
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+header {
+    text-align: center;
+    margin-bottom: 30px;
+    color: white;
+}
+
+header h1 {
+    font-size: 3rem;
+    margin-bottom: 10px;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+}
+
+header p {
+    font-size: 1.2rem;
+    opacity: 0.9;
+}
+
+.game-info {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: rgba(255,255,255,0.1);
+    padding: 20px;
+    border-radius: 15px;
+    margin-bottom: 30px;
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255,255,255,0.2);
+}
+
+.controls-info {
+    color: white;
+    font-size: 1.1rem;
+}
+
+.game-objective {
+    color: white;
+    font-size: 1.1rem;
+    text-align: center;
+}
+
+.controls-info strong {
+    background: rgba(255,255,255,0.2);
+    padding: 5px 10px;
+    border-radius: 5px;
+    margin: 0 5px;
+}
+
+.energy-bars-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 20px;
+    margin-bottom: 30px;
+}
+
+.player-bar {
+    background: rgba(255,255,255,0.95);
+    border-radius: 20px;
+    padding: 20px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.player-bar:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 15px 40px rgba(0,0,0,0.3);
+}
+
+.player-bar.active {
+    border: 3px solid #4CAF50;
+    box-shadow: 0 0 20px rgba(76, 175, 80, 0.5);
+}
+
+.player-label {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+}
+
+.player-name {
+    font-size: 1.2rem;
+    font-weight: bold;
+    color: #333;
+}
+
+.player-score {
+    background: #4CAF50;
+    color: white;
+    padding: 5px 15px;
+    border-radius: 20px;
+    font-weight: bold;
+    font-size: 1.1rem;
+}
+
+.energy-bar {
+    position: relative;
+    height: 300px;
+    background: #f0f0f0;
+    border-radius: 15px;
+    overflow: hidden;
+    margin-bottom: 15px;
+    border: 3px solid #333;
+}
+
+.energy-fill {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 0%;
+    background: linear-gradient(to top, #ff0000, #ff8000, #ffff00, #80ff00, #00ff00, #00ffff, #0080ff);
+    transition: height 0.3s ease;
+    border-radius: 12px;
+}
+
+.energy-segments {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+}
+
+.segment {
+    height: 14.28%;
+    border-bottom: 2px solid rgba(255,255,255,0.8);
+}
+
+.segment.red { background: rgba(255, 0, 0, 0.1); }
+.segment.orange { background: rgba(255, 128, 0, 0.1); }
+.segment.yellow { background: rgba(255, 255, 0, 0.1); }
+.segment.light-green { background: rgba(128, 255, 0, 0.1); }
+.segment.green { background: rgba(0, 255, 0, 0.1); }
+.segment.light-blue { background: rgba(0, 255, 255, 0.1); }
+.segment.blue { background: rgba(0, 128, 255, 0.1); }
+
+.player-status {
+    text-align: center;
+    font-weight: bold;
+    color: #666;
+    font-size: 1rem;
+}
+
+.game-controls {
+    text-align: center;
+    margin-bottom: 30px;
+}
+
+.btn {
+    padding: 15px 30px;
+    margin: 0 10px;
+    border: none;
+    border-radius: 25px;
+    font-size: 1.1rem;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.btn-primary {
+    background: linear-gradient(45deg, #4CAF50, #45a049);
+    color: white;
+    box-shadow: 0 5px 15px rgba(76, 175, 80, 0.4);
+}
+
+.btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(76, 175, 80, 0.6);
+}
+
+.btn-secondary {
+    background: linear-gradient(45deg, #f44336, #d32f2f);
+    color: white;
+    box-shadow: 0 5px 15px rgba(244, 67, 54, 0.4);
+}
+
+.btn-secondary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(244, 67, 54, 0.6);
+}
+
+.btn-config {
+    background: linear-gradient(45deg, #9C27B0, #673AB7);
+    color: white;
+    box-shadow: 0 5px 15px rgba(156, 39, 176, 0.4);
+}
+
+.btn-config:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(156, 39, 176, 0.6);
+}
+
+.btn-reset {
+    background: linear-gradient(45deg, #FF9800, #F57C00);
+    color: white;
+    box-shadow: 0 5px 15px rgba(255, 152, 0, 0.4);
+}
+
+.btn-reset:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(255, 152, 0, 0.6);
+}
+
+/* Botão de nova partida */
+.new-game-button {
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1001;
+    animation: newGameButtonPop 0.5s ease-out;
+    text-align: center;
+}
+
+.auto-restart-info {
+    margin-bottom: 15px;
+    color: white;
+    background: rgba(0,0,0,0.8);
+    padding: 10px 20px;
+    border-radius: 15px;
+    border: 2px solid #FFD700;
+}
+
+.auto-restart-info p {
+    margin: 0;
+    font-size: 1.1rem;
+    font-weight: bold;
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
+}
+
+#restartCountdown {
+    color: #FFD700;
+    font-size: 1.3rem;
+    font-weight: bold;
+}
+
+@keyframes newGameButtonPop {
+    0% { 
+        transform: translateX(-50%) scale(0.5); 
+        opacity: 0; 
+    }
+    100% { 
+        transform: translateX(-50%) scale(1); 
+        opacity: 1; 
+    }
+}
+
+/* Animações para as barras */
+.player-bar.pedaling {
+    /* Removido efeito shake/pulse */
+}
+
+/* Efeitos especiais para o vencedor - Estilo Cassino */
+.player-bar.winner {
+    animation: winnerCasinoGlow 0.8s ease-in-out infinite;
+    border: 6px solid #FFD700;
+    box-shadow: 
+        0 0 20px rgba(255, 215, 0, 1),
+        0 0 40px rgba(255, 215, 0, 0.8),
+        0 0 60px rgba(255, 215, 0, 0.6);
+    position: relative;
+    overflow: visible;
+}
+
+.player-bar.winner::before {
+    content: '';
+    position: absolute;
+    top: -10px;
+    left: -10px;
+    right: -10px;
+    bottom: -10px;
+    background: linear-gradient(45deg, transparent, #FFD700, transparent, #FF0000, transparent, #00FF00, transparent);
+    background-size: 400% 400%;
+    border-radius: 25px;
+    z-index: -1;
+    animation: winnerLaserScan 1.5s linear infinite;
+}
+
+.player-bar.winner::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: 
+        repeating-linear-gradient(
+            0deg,
+            transparent 0px,
+            transparent 8px,
+            rgba(255, 215, 0, 0.3) 8px,
+            rgba(255, 215, 0, 0.3) 12px
+        );
+    border-radius: 20px;
+    animation: winnerStripesMove 0.5s linear infinite;
+}
+
+@keyframes winnerCasinoGlow {
+    0%, 100% { 
+        transform: scale(1);
+        box-shadow: 
+            0 0 20px rgba(255, 215, 0, 1),
+            0 0 40px rgba(255, 215, 0, 0.8),
+            0 0 60px rgba(255, 215, 0, 0.6);
+    }
+    25% { 
+        transform: scale(1);
+        box-shadow: 
+            0 0 30px rgba(255, 0, 0, 1),
+            0 0 50px rgba(255, 0, 0, 0.8),
+            0 0 70px rgba(255, 0, 0, 0.6);
+    }
+    50% { 
+        transform: scale(1);
+        box-shadow: 
+            0 0 40px rgba(0, 255, 0, 1),
+            0 0 60px rgba(0, 255, 0, 0.8),
+            0 0 80px rgba(0, 255, 0, 0.6);
+    }
+    75% { 
+        transform: scale(1);
+        box-shadow: 
+            0 0 30px rgba(0, 0, 255, 1),
+            0 0 50px rgba(0, 0, 255, 0.8),
+            0 0 70px rgba(0, 0, 255, 0.6);
+    }
+}
+
+@keyframes winnerLaserScan {
+    0% { 
+        background-position: 0% 50%; 
+    }
+    100% { 
+        background-position: 400% 50%; 
+    }
+}
+
+@keyframes winnerStripesMove {
+    0% { 
+        background-position: 0 0; 
+    }
+    100% { 
+        background-position: 20px 0; 
+    }
+}
+
+.energy-bar.winner {
+    border: 6px solid #FFD700;
+    box-shadow: 
+        inset 0 0 20px rgba(255, 215, 0, 0.8),
+        inset 0 0 40px rgba(255, 215, 0, 0.6);
+    position: relative;
+    overflow: hidden;
+}
+
+.energy-bar.winner::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: 
+        radial-gradient(circle, rgba(255,255,255,0.3) 0%, transparent 70%);
+    animation: winnerSpotlightScan 2s linear infinite;
+    pointer-events: none;
+}
+
+@keyframes winnerSpotlightScan {
+    0% { 
+        transform: rotate(0deg); 
+    }
+    100% { 
+        transform: rotate(360deg); 
+    }
+}
+
+.energy-fill.winner {
+    background: linear-gradient(to top, 
+        #ff0000, #ff4000, #ff8000, #ffc000, 
+        #ffff00, #c0ff00, #80ff00, #40ff00, 
+        #00ff00, #00ff40, #00ff80, #00ffc0, 
+        #00ffff, #00c0ff, #0080ff, #0040ff, 
+        #0000ff
+    );
+    animation: winnerEnergyStrobe 0.3s ease-in-out infinite;
+    position: relative;
+}
+
+.energy-fill.winner::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: 
+        repeating-linear-gradient(
+            90deg,
+            transparent 0px,
+            transparent 2px,
+            rgba(255, 255, 255, 0.5) 2px,
+            rgba(255, 255, 255, 0.5) 4px
+        );
+    animation: winnerLaserDots 0.2s linear infinite;
+}
+
+@keyframes winnerEnergyStrobe {
+    0%, 100% { 
+        filter: brightness(1) saturate(1) hue-rotate(0deg);
+    }
+    25% { 
+        filter: brightness(1.5) saturate(2) hue-rotate(90deg);
+    }
+    50% { 
+        filter: brightness(2) saturate(3) hue-rotate(180deg);
+    }
+    75% { 
+        filter: brightness(1.5) saturate(2) hue-rotate(270deg);
+    }
+}
+
+@keyframes winnerLaserDots {
+    0% { 
+        background-position: 0 0; 
+    }
+    100% { 
+        background-position: 8px 0; 
+    }
+}
+
+/* Estilos para as barras dos perdedores */
+.player-bar.loser {
+    filter: grayscale(100%) brightness(0.3);
+    opacity: 0.7;
+    transition: all 0.5s ease;
+}
+
+.energy-bar.loser {
+    background: #000 !important;
+    border-color: #333 !important;
+}
+
+.energy-fill.loser {
+    background: #000 !important;
+    opacity: 0.5;
+}
+
+.player-name.loser {
+    color: #666 !important;
+}
+
+.player-score.loser {
+    background: #333 !important;
+    color: #999 !important;
+}
+
+.player-status.loser {
+    color: #666 !important;
+}
+
+@keyframes winnerScoreSpin {
+    0% { 
+        transform: scale(1) rotate(0deg); 
+    }
+    50% { 
+        transform: scale(1.3) rotate(180deg); 
+    }
+    100% { 
+        transform: scale(1.2) rotate(360deg); 
+    }
+}
+
+
+
+/* Menu de Configurações */
+.config-menu {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.8);
+    z-index: 1000;
+    justify-content: center;
+    align-items: center;
+}
+
+.config-menu.show {
+    display: flex;
+}
+
+.config-content {
+    background: white;
+    padding: 30px;
+    border-radius: 20px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    max-width: 500px;
+    width: 90%;
+    max-height: 80vh;
+    overflow-y: auto;
+}
+
+.config-content h3 {
+    text-align: center;
+    margin-bottom: 25px;
+    color: #333;
+    font-size: 1.5rem;
+}
+
+.config-group {
+    margin-bottom: 20px;
+}
+
+.config-group label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: bold;
+    color: #555;
+}
+
+.config-group input[type="range"] {
+    width: 100%;
+    margin-bottom: 5px;
+}
+
+.config-value {
+    display: inline-block;
+    background: #4CAF50;
+    color: white;
+    padding: 3px 10px;
+    border-radius: 15px;
+    font-weight: bold;
+    font-size: 0.9rem;
+}
+
+.config-buttons {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    margin-top: 25px;
+    flex-wrap: wrap;
+}
+
+.config-status {
+    text-align: center;
+    margin-top: 15px;
+    padding: 10px;
+    background: rgba(76, 175, 80, 0.1);
+    border-radius: 10px;
+    border: 1px solid rgba(76, 175, 80, 0.3);
+}
+
+.config-status p {
+    margin: 0;
+    color: #4CAF50;
+    font-size: 0.9rem;
+    font-weight: bold;
+}
+
+/* Responsividade */
+@media (max-width: 768px) {
+    .energy-bars-container {
+        grid-template-columns: 1fr;
+    }
+    
+    .game-info {
+        flex-direction: column;
+        gap: 15px;
+    }
+    
+    header h1 {
+        font-size: 2rem;
+    }
+    
+    .energy-bar {
+        height: 200px;
+    }
+    
+    .config-content {
+        padding: 20px;
+        margin: 20px;
+    }
+    
+    .config-buttons {
+        flex-direction: column;
+    }
+}
+
+/* Efeitos de partículas para vencedor */
+.winner-display.show::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: 
+        radial-gradient(circle at 20% 20%, rgba(255, 215, 0, 0.3) 0%, transparent 50%),
+        radial-gradient(circle at 80% 80%, rgba(255, 215, 0, 0.3) 0%, transparent 50%),
+        radial-gradient(circle at 40% 60%, rgba(255, 215, 0, 0.3) 0%, transparent 50%);
+    animation: sparkle 2s ease-in-out infinite;
+}
+
+@keyframes sparkle {
+    0%, 100% { opacity: 0.3; }
+    50% { opacity: 0.8; }
+}
