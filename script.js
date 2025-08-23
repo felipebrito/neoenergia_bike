@@ -272,10 +272,12 @@ class BikeJJGame {
         console.log(`⚡ Jogador ${player.id}: Energia ${oldEnergy.toFixed(3)} → ${player.energy.toFixed(3)}/${this.maxEnergy}, Pontuação: ${player.score.toFixed(2)}`);
 
         
-        // Verificar se atingiu energia máxima
+                // Verificar se atingiu energia máxima
         if (player.energy >= this.maxEnergy) {
             console.log(`🏆 VITÓRIA IMEDIATA! Jogador ${player.id} atingiu energia máxima!`);
-
+            console.log(`🔍 Windows Debug - Energia final: ${player.energy.toFixed(3)}, Max: ${this.maxEnergy}`);
+            console.log(`🔍 Windows Debug - Comparação: ${player.energy} >= ${this.maxEnergy} = ${player.energy >= this.maxEnergy}`);
+            
             this.endGameWithWinner(player);
             return;
         }
@@ -326,13 +328,15 @@ class BikeJJGame {
                 player.score += 0.05; // Reduzido o bônus de consistência
             }
             
-            // Verificar se algum jogador atingiu energia máxima (vitória instantânea)
-            if (player.energy >= this.maxEnergy) {
-                console.log(`🏆 VITÓRIA! Jogador ${player.id} atingiu energia máxima: ${player.energy.toFixed(3)}/${this.maxEnergy}`);
-                
-                this.endGameWithWinner(player);
-                return;
-            }
+                    // Verificar se algum jogador atingiu energia máxima (vitória instantânea)
+        if (player.energy >= this.maxEnergy) {
+            console.log(`🏆 VITÓRIA! Jogador ${player.id} atingiu energia máxima: ${player.energy.toFixed(3)}/${this.maxEnergy}`);
+            console.log(`🔍 Windows Debug - Comparação: ${player.energy} >= ${this.maxEnergy} = ${player.energy >= this.maxEnergy}`);
+            console.log(`🔍 Windows Debug - Tipos: energia=${typeof player.energy}, maxEnergy=${typeof this.maxEnergy}`);
+            
+            this.endGameWithWinner(player);
+            return;
+        }
             
 
         });

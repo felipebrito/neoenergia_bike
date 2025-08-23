@@ -204,6 +204,13 @@ npx serve .
 - **Evite abrir index.html diretamente** (problemas de persistência)
 - **Porta 8001** é a padrão configurada
 
+### **🪟 Problemas Específicos do Windows:**
+- **Debug disponível**: Acesse `/windows_debug.html` para testes específicos
+- **Script de teste**: Execute `python3 windows_test.py` para diagnóstico
+- **Console do navegador**: Pressione F12 para ver logs de debug
+- **Logs específicos**: Console mostra comparações de vitória para Windows
+- **Verificação de tipos**: Debug automático de tipos de dados
+
 
 
 ---
