@@ -200,6 +200,8 @@
                 timestamp: Date.now()
             };
             
+            log(`📤 Enviando: ${JSON.stringify(testData)}`);
+            
             fetch('/api/udp', {
                 method: 'POST',
                 headers: {
@@ -207,9 +209,13 @@
                 },
                 body: JSON.stringify(testData)
             })
-            .then(response => response.json())
+            .then(response => {
+                log(`📥 Resposta HTTP: ${response.status} ${response.statusText}`);
+                return response.json();
+            })
             .then(data => {
                 log(`✅ UDP testado com sucesso: ${JSON.stringify(data)}`);
+                log(`🎯 Verifique o console do servidor para logs UDP`);
             })
             .catch(error => {
                 log(`❌ Erro no teste UDP: ${error}`);

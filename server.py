@@ -53,6 +53,9 @@ class BikeJJHandler(http.server.SimpleHTTPRequestHandler):
                         elif data.get('type') == 'reset':
                             print("🔄 Enviando reset do jogo")
                             udp_server.send_game_reset()
+                        elif data.get('type') == 'test':
+                            print(f"🧪 Enviando mensagem de teste: {data.get('player_id')}")
+                            udp_server.send_test_message(data.get('player_id'))
                         else:
                             print(f"⚠️ Tipo de mensagem desconhecido: {data.get('type')}")
                     else:

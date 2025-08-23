@@ -63,6 +63,16 @@ class BikeJJUDPServer:
             "timestamp": time.time()
         }
         self._send_message(message)
+    
+    def send_test_message(self, player_id):
+        """Enviar mensagem de teste via UDP"""
+        message = {
+            "type": "test",
+            "player_id": player_id,
+            "timestamp": time.time()
+        }
+        self._send_message(message)
+        print(f"🧪 Mensagem de teste enviada para fila UDP: Jogador {player_id}")
         
     def _send_message(self, message):
         """Adicionar mensagem à fila para envio"""
