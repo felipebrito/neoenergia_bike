@@ -15,6 +15,10 @@ class BikeJJGame {
         
         this.maxEnergy = 100; // Fixo em 100%
         
+        // Sistema de relatórios
+        this.gameReports = [];
+        this.currentGameReport = null;
+        
         this.players = [
             { id: 1, key: 'KeyQ', energy: 0, score: 0, isPedaling: false, lastPedalTime: 0 },
             { id: 2, key: 'KeyW', energy: 0, score: 0, isPedaling: false, lastPedalTime: 0 },
@@ -28,6 +32,7 @@ class BikeJJGame {
     init() {
         this.setupEventListeners();
         this.setupGameLoop();
+        this.loadGameReports(); // Carregar relatórios salvos
         this.updateDisplay();
     }
     
@@ -42,6 +47,8 @@ class BikeJJGame {
         document.getElementById('closeConfig').addEventListener('click', () => this.hideConfigMenu());
         document.getElementById('applyConfig').addEventListener('click', () => this.applyConfig());
         document.getElementById('resetConfig').addEventListener('click', () => this.resetConfig());
+        
+
         
         // Eventos dos sliders de configuração
         this.setupConfigSliders();
@@ -71,6 +78,9 @@ class BikeJJGame {
         if (this.gameState !== 'waiting') return;
         
         this.gameState = 'playing';
+        
+        // Iniciar relatório da partida atual
+        this.startGameReport();
         
         // Reset das barras de energia
         this.players.forEach(player => {
@@ -123,9 +133,27 @@ class BikeJJGame {
         const energyBonus = Math.floor(player.energy / 20); // Reduzido o bônus
         player.score += 0.5 + energyBonus; // Reduzido o ganho base
         
-        // Removido efeito visual de pedalada
+        // Registrar evento de pedalada no relatório
+        this.recordPedalEvent(playerId, player.energy);
         
         this.updateDisplay();
+    }
+    
+    recordPedalEvent(playerId, energy) {
+        if (!this.currentGameReport) return;
+        
+        const reportPlayer = this.currentGameReport.players.find(p => p.id === playerId);
+        if (reportPlayer) {
+            reportPlayer.totalPedals++;
+            reportPlayer.energyHistory.push(energy);
+            reportPlayer.pedalTimestamps.push(new Date().toISOString());
+            
+            // Adicionar evento de pedalada
+            this.addGameEvent('pedal', `Jogador ${playerId} pedalou`, playerId, {
+                energy: energy,
+                totalPedals: reportPlayer.totalPedals
+            });
+        }
     }
     
     stopPedaling(playerId) {
@@ -156,6 +184,8 @@ class BikeJJGame {
             }
         });
         
+        // Atualizar relatório em tempo real
+        this.updateGameReport();
         this.updateDisplay();
     }
     
@@ -230,6 +260,9 @@ class BikeJJGame {
         
         // Efeitos visuais especiais - mais intensos
         this.createCasinoParticles(winner.id);
+        
+        // Finalizar relatório da partida
+        this.finalizeGameReport(winner, isEnergyMax);
         
         // Mostrar mensagem de vitória
         if (isEnergyMax) {
@@ -407,6 +440,201 @@ class BikeJJGame {
         // Reiniciar automaticamente após 10 segundos e iniciar o jogo
         this.newGame();
         this.startGame();
+    }
+    
+    // Métodos para sistema de relatórios
+    startGameReport() {
+        this.currentGameReport = {
+            gameId: Date.now(),
+            startTime: new Date().toISOString(),
+            endTime: null,
+            duration: 0,
+            winner: null,
+            players: [],
+            gameConfig: {
+                energyGainRate: this.energyGainRate,
+                energyDecayRate: this.energyDecayRate,
+                maxEnergy: this.maxEnergy
+            },
+            events: [],
+            statistics: {
+                totalPedals: 0,
+                maxEnergyReached: 0,
+                averageEnergy: 0
+            }
+        };
+        
+        // Inicializar dados dos jogadores
+        this.players.forEach(player => {
+            this.currentGameReport.players.push({
+                id: player.id,
+                key: player.key,
+                finalScore: 0,
+                finalEnergy: 0,
+                totalPedals: 0,
+                maxEnergyReached: 0,
+                averageEnergy: 0,
+                energyHistory: [],
+                pedalTimestamps: []
+            });
+        });
+        
+        // Adicionar evento de início
+        this.addGameEvent('game_started', 'Jogo iniciado');
+    }
+    
+    addGameEvent(type, description, playerId = null, data = {}) {
+        if (this.currentGameReport) {
+            this.currentGameReport.events.push({
+                timestamp: new Date().toISOString(),
+                type: type,
+                description: description,
+                playerId: playerId,
+                data: data
+            });
+        }
+    }
+    
+    updateGameReport() {
+        if (!this.currentGameReport) return;
+        
+        // Atualizar estatísticas dos jogadores
+        this.players.forEach((player, index) => {
+            const reportPlayer = this.currentGameReport.players[index];
+            reportPlayer.finalScore = Math.floor(player.score);
+            reportPlayer.finalEnergy = player.energy;
+            reportPlayer.maxEnergyReached = Math.max(reportPlayer.maxEnergyReached, player.energy);
+            
+            // Calcular energia média
+            if (reportPlayer.energyHistory.length > 0) {
+                const sum = reportPlayer.energyHistory.reduce((a, b) => a + b, 0);
+                reportPlayer.averageEnergy = sum / reportPlayer.energyHistory.length;
+            }
+        });
+        
+        // Atualizar estatísticas gerais
+        this.currentGameReport.statistics.totalPedals = this.currentGameReport.players.reduce((sum, p) => sum + p.totalPedals, 0);
+        this.currentGameReport.statistics.maxEnergyReached = Math.max(...this.currentGameReport.players.map(p => p.maxEnergyReached));
+        this.currentGameReport.statistics.averageEnergy = this.currentGameReport.players.reduce((sum, p) => sum + p.averageEnergy, 0) / this.currentGameReport.players.length;
+    }
+    
+    finalizeGameReport(winner, isEnergyMax = false) {
+        if (!this.currentGameReport) return;
+        
+        this.currentGameReport.endTime = new Date().toISOString();
+        this.currentGameReport.duration = new Date(this.currentGameReport.endTime) - new Date(this.currentGameReport.startTime);
+        this.currentGameReport.winner = {
+            id: winner.id,
+            score: Math.floor(winner.score),
+            energy: winner.energy,
+            victoryType: isEnergyMax ? 'energy_max' : 'time_limit'
+        };
+        
+        // Atualizar estatísticas finais
+        this.updateGameReport();
+        
+        // Adicionar evento de vitória
+        this.addGameEvent('game_ended', `Jogador ${winner.id} venceu!`, winner.id, {
+            score: Math.floor(winner.score),
+            energy: winner.energy,
+            victoryType: isEnergyMax ? 'energy_max' : 'time_limit'
+        });
+        
+        // Salvar relatório
+        this.gameReports.push(this.currentGameReport);
+        this.saveGameReports();
+        
+        // Mostrar resumo da partida
+        this.showGameSummary();
+        
+        this.currentGameReport = null;
+    }
+    
+    saveGameReports() {
+        try {
+            localStorage.setItem('bikejj_game_reports', JSON.stringify(this.gameReports));
+            console.log('📊 Relatórios de partidas salvos:', this.gameReports.length);
+        } catch (error) {
+            console.error('❌ Erro ao salvar relatórios:', error);
+        }
+    }
+    
+    loadGameReports() {
+        try {
+            const savedReports = localStorage.getItem('bikejj_game_reports');
+            if (savedReports) {
+                this.gameReports = JSON.parse(savedReports);
+                console.log('📊 Relatórios de partidas carregados:', this.gameReports.length);
+            }
+        } catch (error) {
+            console.error('❌ Erro ao carregar relatórios:', error);
+            this.gameReports = [];
+        }
+    }
+    
+    showGameSummary() {
+        const report = this.gameReports[this.gameReports.length - 1];
+        if (!report) return;
+        
+        const summary = `
+🏆 RESUMO DA PARTIDA #${report.gameId}
+
+⏰ Duração: ${Math.round(report.duration / 1000)}s
+👑 Vencedor: Jogador ${report.winner.id}
+📊 Pontuação: ${report.winner.score}
+⚡ Energia Final: ${report.winner.energy.toFixed(1)}%
+🎮 Tipo de Vitória: ${report.winner.victoryType === 'energy_max' ? 'Energia Máxima' : 'Tempo'}
+
+📈 ESTATÍSTICAS:
+• Total de pedaladas: ${report.statistics.totalPedals}
+• Energia máxima atingida: ${report.statistics.maxEnergyReached.toFixed(1)}%
+• Energia média: ${report.statistics.averageEnergy.toFixed(1)}%
+
+⚙️ CONFIGURAÇÕES:
+• Geração: ${report.gameConfig.energyGainRate}% por pedalada
+• Decaimento: ${report.gameConfig.energyDecayRate}% por segundo
+        `;
+        
+        console.log(summary);
+        this.showMessage(`🏆 Partida finalizada! Jogador ${report.winner.id} venceu!`);
+    }
+    
+    exportGameReports() {
+        const dataStr = JSON.stringify(this.gameReports, null, 2);
+        const dataBlob = new Blob([dataStr], {type: 'application/json'});
+        
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(dataBlob);
+        link.download = `bikejj_game_reports_${new Date().toISOString().split('T')[0]}.json`;
+        link.click();
+        
+        this.showMessage('📊 Relatórios exportados com sucesso!');
+    }
+    
+    showGameReports() {
+        if (this.gameReports.length === 0) {
+            this.showMessage('📊 Nenhuma partida registrada ainda');
+            return;
+        }
+        
+        let reportsText = `📊 RELATÓRIOS DE PARTIDAS (${this.gameReports.length} partidas)\n\n`;
+        
+        this.gameReports.forEach((report, index) => {
+            const startDate = new Date(report.startTime).toLocaleString('pt-BR');
+            const duration = Math.round(report.duration / 1000);
+            
+            reportsText += `🎮 PARTIDA #${index + 1} (ID: ${report.gameId})\n`;
+            reportsText += `📅 Data: ${startDate}\n`;
+            reportsText += `⏱️ Duração: ${duration}s\n`;
+            reportsText += `🏆 Vencedor: Jogador ${report.winner.id}\n`;
+            reportsText += `📊 Pontuação: ${report.winner.score}\n`;
+            reportsText += `⚡ Energia: ${report.winner.energy.toFixed(1)}%\n`;
+            reportsText += `🎯 Tipo: ${report.winner.victoryType === 'energy_max' ? 'Energia Máxima' : 'Tempo'}\n`;
+            reportsText += `📈 Total Pedaladas: ${report.statistics.totalPedals}\n\n`;
+        });
+        
+        console.log(reportsText);
+        this.showMessage(`📊 ${this.gameReports.length} partidas registradas! Ver console para detalhes.`);
     }
     
     resetGame() {
@@ -692,6 +920,11 @@ console.log(`
 - Ajuste taxa de decaimento para diferentes níveis de dificuldade
 - Configurações são salvas automaticamente no navegador
 - Persistem entre sessões e recarregamentos
+
+📊 RELATÓRIOS:
+- Cada partida é registrada com timestamp e estatísticas
+- Clique em "📈 Dashboard de Relatórios" para visualização completa
+- Dados persistem no navegador e podem ser exportados
 
 🎯 OBJETIVO:
 Ser o primeiro a atingir 100% de energia!

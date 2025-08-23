@@ -163,6 +163,11 @@ header p {
 
 .game-controls {
     text-align: center;
+    margin-bottom: 20px;
+}
+
+.reports-controls {
+    text-align: center;
     margin-bottom: 30px;
 }
 
@@ -221,6 +226,28 @@ header p {
 .btn-reset:hover {
     transform: translateY(-2px);
     box-shadow: 0 8px 25px rgba(255, 152, 0, 0.6);
+}
+
+.btn-info {
+    background: linear-gradient(45deg, #2196F3, #1976D2);
+    color: white;
+    box-shadow: 0 5px 15px rgba(33, 150, 243, 0.4);
+}
+
+.btn-info:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(33, 150, 243, 0.6);
+}
+
+.btn-success {
+    background: linear-gradient(45deg, #4CAF50, #388E3C);
+    color: white;
+    box-shadow: 0 5px 15px rgba(76, 175, 80, 0.4);
+}
+
+.btn-success:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(76, 175, 80, 0.6);
 }
 
 /* Botão de nova partida */
