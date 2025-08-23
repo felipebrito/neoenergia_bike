@@ -4,7 +4,8 @@ Teste específico para Windows - Simula o jogo e identifica problemas
 """
 import time
 import json
-import requests
+import urllib.request
+import urllib.error
 
 def test_windows_game():
     print("🪟 Teste Específico para Windows")
@@ -55,8 +56,13 @@ def test_windows_game():
     
     try:
         # Testar se o servidor está respondendo
-        response = requests.get('http://localhost:8001/', timeout=5)
-        print(f"   ✅ Servidor respondendo: {response.status_code}")
+        try:
+            response = urllib.request.urlopen('http://localhost:8001/', timeout=5)
+            print(f"   ✅ Servidor respondendo: {response.getcode()}")
+            response.close()
+        except urllib.error.URLError as e:
+            print(f"   ❌ Servidor não está rodando: {e}")
+            return
         
         # Testar UDP
         udp_data = {
@@ -65,15 +71,26 @@ def test_windows_game():
             "timestamp": int(time.time() * 1000)
         }
         
-        udp_response = requests.post('http://localhost:8001/api/udp', 
-                                   json=udp_data, 
-                                   timeout=5)
-        print(f"   ✅ UDP funcionando: {udp_response.status_code}")
+        # Converter para JSON e bytes
+        json_data = json.dumps(udp_data).encode('utf-8')
         
-    except requests.exceptions.ConnectionError:
-        print("   ❌ Servidor não está rodando")
+        # Criar request para POST
+        req = urllib.request.Request(
+            'http://localhost:8001/api/udp',
+            data=json_data,
+            headers={'Content-Type': 'application/json'},
+            method='POST'
+        )
+        
+        try:
+            udp_response = urllib.request.urlopen(req, timeout=5)
+            print(f"   ✅ UDP funcionando: {udp_response.getcode()}")
+            udp_response.close()
+        except urllib.error.URLError as e:
+            print(f"   ❌ Erro no UDP: {e}")
+        
     except Exception as e:
-        print(f"   ❌ Erro: {e}")
+        print(f"   ❌ Erro geral: {e}")
     
     print()
     print("🎯 Recomendações para Windows:")
