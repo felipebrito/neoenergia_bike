@@ -259,13 +259,21 @@ class BikeJJGame {
         player.isPedaling = true;
         
         // Aumentar energia
+        const oldEnergy = player.energy;
         player.energy = Math.min(this.maxEnergy, player.energy + this.energyGainRate);
         
         // Adicionar pontuação baseada na energia atual
         const energyBonus = Math.floor(player.energy / 20); // Reduzido o bônus
         player.score += 0.5 + energyBonus; // Reduzido o ganho base
         
-        console.log('⚡ Energia atual:', player.energy, 'Pontuação:', player.score);
+        console.log(`⚡ Jogador ${player.id}: Energia ${oldEnergy.toFixed(2)} → ${player.energy.toFixed(2)}/${this.maxEnergy}, Pontuação: ${player.score.toFixed(2)}`);
+        
+        // Verificar se atingiu energia máxima
+        if (player.energy >= this.maxEnergy) {
+            console.log(`🏆 VITÓRIA IMEDIATA! Jogador ${player.id} atingiu energia máxima!`);
+            this.endGameWithWinner(player);
+            return;
+        }
         
         // Registrar evento de pedalada no relatório
         this.updateDisplay();
@@ -301,7 +309,11 @@ class BikeJJGame {
         this.players.forEach(player => {
             // Decaimento natural da energia
             if (!player.isPedaling) {
+                const oldEnergy = player.energy;
                 player.energy = Math.max(0, player.energy - (this.energyDecayRate / 60));
+                if (oldEnergy !== player.energy) {
+                    console.log(`📉 Jogador ${player.id}: Decaimento ${oldEnergy.toFixed(2)} → ${player.energy.toFixed(2)}`);
+                }
             }
             
             // Atualizar pontuação baseada na energia constante
@@ -311,8 +323,14 @@ class BikeJJGame {
             
             // Verificar se algum jogador atingiu energia máxima (vitória instantânea)
             if (player.energy >= this.maxEnergy) {
+                console.log(`🏆 VITÓRIA! Jogador ${player.id} atingiu energia máxima: ${player.energy}/${this.maxEnergy}`);
                 this.endGameWithWinner(player);
                 return;
+            }
+            
+            // Debug: mostrar energia atual
+            if (player.energy > 90) {
+                console.log(`⚠️ Jogador ${player.id} com energia alta: ${player.energy.toFixed(2)}/${this.maxEnergy}`);
             }
         });
         
