@@ -403,10 +403,14 @@ class BikeJJGame {
                 // Segmento completamente ativo
                 segment.className = `segment ${this.getSegmentColor(index)} active`;
             } else {
-                // Segmento em transição (interpolação)
+                // Segmento em transição (interpolação na altura)
                 const progress = (energy - previousSegmentEnergy) / (segmentEnergy - previousSegmentEnergy);
                 segment.className = `segment ${this.getSegmentColor(index)} transitioning`;
-                segment.style.opacity = 0.3 + (progress * 0.7); // De 30% a 100%
+                
+                // Interpolação na altura: cresce de baixo para cima
+                const segmentHeight = 14.28; // Altura de cada segmento em %
+                const fillHeight = segmentHeight * progress;
+                segment.style.clipPath = `inset(${100 - fillHeight}% 0 0 0)`;
             }
         });
     }
@@ -423,6 +427,7 @@ class BikeJJGame {
         segments.forEach((segment, index) => {
             // Aplicar cor baseada na posição e estado inicial apagado
             segment.className = `segment ${this.getSegmentColor(index)} off`;
+            segment.style.clipPath = 'inset(100% 0 0 0)'; // Completamente escondido
         });
     }
     
