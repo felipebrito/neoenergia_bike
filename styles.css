@@ -153,6 +153,7 @@ header p {
     overflow: hidden;
     margin-bottom: 15px;
     border: 3px solid #404040;
+    transform: rotate(180deg); /* Girar 180° para crescer de baixo para cima */
 }
 
 .energy-fill {
