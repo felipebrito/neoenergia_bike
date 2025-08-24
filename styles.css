@@ -266,6 +266,39 @@ header p {
 .segment.light-blue { background: #0066ff; } /* Azul */
 .segment.blue { background: #9900ff; } /* Roxo - Alto */
 
+/* Estados das barras */
+.segment.off {
+    background: #333 !important;
+    opacity: 0.3;
+    animation: none;
+}
+
+.segment.dim {
+    opacity: 0.6;
+    animation: none;
+}
+
+.segment.bright {
+    opacity: 1;
+    animation: pulse 0.8s ease-in-out infinite alternate;
+}
+
+.segment.pulsing {
+    opacity: 1;
+    animation: strongPulse 0.5s ease-in-out infinite alternate;
+}
+
+/* Animações */
+@keyframes pulse {
+    0% { opacity: 0.8; transform: scale(1); }
+    100% { opacity: 1; transform: scale(1.02); }
+}
+
+@keyframes strongPulse {
+    0% { opacity: 0.9; transform: scale(1); box-shadow: 0 0 10px currentColor; }
+    100% { opacity: 1; transform: scale(1.05); box-shadow: 0 0 20px currentColor, 0 0 30px currentColor; }
+}
+
 .player-status {
     text-align: center;
     font-weight: bold;

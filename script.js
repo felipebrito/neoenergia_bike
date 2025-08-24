@@ -205,7 +205,9 @@ class BikeJJGame {
             player.energy = 0;
             player.score = 0;
             player.isPedaling = false;
-
+            
+            // Inicializar segmentos como apagados
+            this.initializeEnergySegments(player.id);
         });
         
         document.getElementById('startBtn').disabled = true;
@@ -377,6 +379,49 @@ class BikeJJGame {
             } else {
                 playerBar.classList.remove('active');
             }
+            
+            // Atualizar estados dos segmentos de cores
+            this.updateEnergySegments(player.id, player.energy);
+        });
+    }
+    
+    updateEnergySegments(playerId, energy) {
+        const segments = document.querySelectorAll(`#player${playerId} .segment`);
+        const maxEnergy = this.maxEnergy;
+        
+        segments.forEach((segment, index) => {
+            // Calcular energia necessária para cada segmento
+            const segmentEnergy = (maxEnergy / 7) * (index + 1);
+            const currentSegment = index + 1;
+            
+            // Determinar estado baseado na energia atual
+            if (energy < segmentEnergy * 0.3) {
+                // Segmento apagado
+                segment.className = 'segment off';
+            } else if (energy < segmentEnergy * 0.6) {
+                // Segmento piscando fraco
+                segment.className = 'segment dim';
+            } else if (energy < segmentEnergy * 0.9) {
+                // Segmento brilhante
+                segment.className = 'segment bright';
+            } else {
+                // Segmento pulsando forte
+                segment.className = 'segment pulsing';
+            }
+            
+            // Aplicar cor baseada na posição (de baixo para cima)
+            const colors = ['red', 'orange', 'yellow', 'light-green', 'green', 'light-blue', 'blue'];
+            segment.classList.add(colors[index]);
+        });
+    }
+    
+    initializeEnergySegments(playerId) {
+        const segments = document.querySelectorAll(`#player${playerId} .segment`);
+        
+        segments.forEach((segment, index) => {
+            // Aplicar cor baseada na posição
+            const colors = ['red', 'orange', 'yellow', 'light-green', 'green', 'light-blue', 'blue'];
+            segment.className = `segment ${colors[index]} off`;
         });
     }
     
