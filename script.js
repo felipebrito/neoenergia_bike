@@ -350,10 +350,11 @@ class BikeJJGame {
     
     updateDisplay() {
         this.players.forEach(player => {
-            // Atualizar barra de energia
+            // Atualizar barra de energia (cresce de baixo para cima)
             const energyFill = document.getElementById(`energy${player.id}`);
             const energyPercentage = (player.energy / this.maxEnergy) * 100;
             energyFill.style.height = `${energyPercentage}%`;
+            energyFill.style.bottom = '0'; // Garantir que cresça de baixo
             
             // Atualizar pontuação
             const scoreElement = document.querySelector(`#player${player.id} .player-score`);
@@ -392,36 +393,36 @@ class BikeJJGame {
         segments.forEach((segment, index) => {
             // Calcular energia necessária para cada segmento
             const segmentEnergy = (maxEnergy / 7) * (index + 1);
-            const currentSegment = index + 1;
+            const previousSegmentEnergy = index > 0 ? (maxEnergy / 7) * index : 0;
             
             // Determinar estado baseado na energia atual
-            if (energy < segmentEnergy * 0.3) {
-                // Segmento apagado
-                segment.className = 'segment off';
-            } else if (energy < segmentEnergy * 0.6) {
-                // Segmento piscando fraco
-                segment.className = 'segment dim';
-            } else if (energy < segmentEnergy * 0.9) {
-                // Segmento brilhante
-                segment.className = 'segment bright';
+            if (energy < previousSegmentEnergy) {
+                // Segmento completamente apagado
+                segment.className = `segment ${this.getSegmentColor(index)} off`;
+            } else if (energy >= segmentEnergy) {
+                // Segmento completamente ativo
+                segment.className = `segment ${this.getSegmentColor(index)} active`;
             } else {
-                // Segmento pulsando forte
-                segment.className = 'segment pulsing';
+                // Segmento em transição (interpolação)
+                const progress = (energy - previousSegmentEnergy) / (segmentEnergy - previousSegmentEnergy);
+                segment.className = `segment ${this.getSegmentColor(index)} transitioning`;
+                segment.style.opacity = 0.3 + (progress * 0.7); // De 30% a 100%
             }
-            
-            // Aplicar cor baseada na posição (de baixo para cima)
-            const colors = ['red', 'orange', 'yellow', 'light-green', 'green', 'light-blue', 'blue'];
-            segment.classList.add(colors[index]);
         });
+    }
+    
+    getSegmentColor(index) {
+        // Cores de baixo para cima (vermelho → azul)
+        const colors = ['red', 'orange', 'yellow', 'light-green', 'green', 'light-blue', 'blue'];
+        return colors[index];
     }
     
     initializeEnergySegments(playerId) {
         const segments = document.querySelectorAll(`#player${playerId} .segment`);
         
         segments.forEach((segment, index) => {
-            // Aplicar cor baseada na posição
-            const colors = ['red', 'orange', 'yellow', 'light-green', 'green', 'light-blue', 'blue'];
-            segment.className = `segment ${colors[index]} off`;
+            // Aplicar cor baseada na posição e estado inicial apagado
+            segment.className = `segment ${this.getSegmentColor(index)} off`;
         });
     }
     

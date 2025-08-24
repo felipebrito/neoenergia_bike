@@ -34,84 +34,7 @@ body::before {
     50% { opacity: 0.6; transform: scale(1.1); }
 }
 
-/* Efeitos de scan interativos - Orientação de baixo para cima */
-.scan-line {
-    position: absolute;
-    width: 100%;
-    height: 4px;
-    background: linear-gradient(90deg, transparent, #00ffff, #ff00ff, #00ffff, transparent);
-    opacity: 0;
-    z-index: 10;
-    pointer-events: none;
-    border-radius: 2px;
-    box-shadow: 0 0 10px rgba(0, 255, 255, 0.8);
-}
-
-.scan-line.horizontal {
-    animation: scanHorizontal 6s linear infinite;
-}
-
-.scan-line.vertical {
-    width: 4px;
-    height: 100%;
-    background: linear-gradient(180deg, transparent, #00ffff, #ff00ff, #00ffff, transparent);
-    animation: scanVertical 8s linear infinite;
-    border-radius: 2px;
-    box-shadow: 0 0 10px rgba(0, 255, 255, 0.8);
-}
-
-@keyframes scanHorizontal {
-    0% { 
-        transform: translateX(-100%); 
-        opacity: 0; 
-    }
-    15% { 
-        opacity: 1; 
-    }
-    85% { 
-        opacity: 1; 
-    }
-    100% { 
-        transform: translateX(100%); 
-        opacity: 0; 
-    }
-}
-
-@keyframes scanVertical {
-    0% { 
-        transform: translateY(100%); 
-        opacity: 0; 
-    }
-    15% { 
-        opacity: 1; 
-    }
-    85% { 
-        opacity: 1; 
-    }
-    100% { 
-        transform: translateY(-100%); 
-        opacity: 0; 
-    }
-}
-
-/* Efeito de brilho nas barras - Orientação de baixo para cima */
-.player-bar::after {
-    content: '';
-    position: absolute;
-    bottom: -100%;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(180deg, transparent, rgba(0, 255, 255, 0.3), rgba(255, 255, 255, 0.4), rgba(0, 255, 255, 0.3), transparent);
-    animation: barShine 12s linear infinite;
-    pointer-events: none;
-    border-radius: 20px;
-}
-
-@keyframes barShine {
-    0% { bottom: -100%; }
-    100% { bottom: 100%; }
-}
+/* Efeitos de scan e brilho REMOVIDOS - Barras com cores sólidas */
 
 
 
@@ -273,31 +196,18 @@ header p {
     animation: none;
 }
 
-.segment.dim {
-    opacity: 0.6;
+.segment.transitioning {
+    opacity: 0.6; /* Valor padrão, será sobrescrito pelo JavaScript */
+    animation: none;
+    transition: opacity 0.1s ease;
+}
+
+.segment.active {
+    opacity: 1;
     animation: none;
 }
 
-.segment.bright {
-    opacity: 1;
-    animation: pulse 0.8s ease-in-out infinite alternate;
-}
-
-.segment.pulsing {
-    opacity: 1;
-    animation: strongPulse 0.5s ease-in-out infinite alternate;
-}
-
-/* Animações */
-@keyframes pulse {
-    0% { opacity: 0.8; transform: scale(1); }
-    100% { opacity: 1; transform: scale(1.02); }
-}
-
-@keyframes strongPulse {
-    0% { opacity: 0.9; transform: scale(1); box-shadow: 0 0 10px currentColor; }
-    100% { opacity: 1; transform: scale(1.05); box-shadow: 0 0 20px currentColor, 0 0 30px currentColor; }
-}
+/* Animações - Simplificadas para barras sólidas */
 
 .player-status {
     text-align: center;
