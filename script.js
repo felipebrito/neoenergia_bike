@@ -163,6 +163,8 @@ class BikeJJGame {
                 timestamp: Date.now()
             };
             
+            console.log(`📡 Tentando enviar UDP:`, data);
+            
             const response = await fetch('/api/udp', {
                 method: 'POST',
                 headers: {
@@ -172,7 +174,9 @@ class BikeJJGame {
             });
             
             if (response.ok) {
-                console.log(`📡 UDP enviado: ${type} - Jogador ${playerId}`);
+                console.log(`📡 UDP enviado com sucesso: ${type} - Jogador ${playerId}`);
+                const responseData = await response.text();
+                console.log(`📡 Resposta do servidor:`, responseData);
             } else {
                 console.error('❌ Erro ao enviar UDP:', response.statusText);
             }

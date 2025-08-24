@@ -93,7 +93,7 @@ class BikeJJUDPServer:
                     
                     # Enviar para múltiplos destinos para garantir recepção
                     destinations = [
-                        ('127.0.0.1', 8888),           # Aparato (porta 8888)
+                        ('127.0.0.1', 8887),           # Aparato (porta 8887)
                         ('127.0.0.1', self.port),      # Localhost (porta 8887)
                         ('localhost', self.port),       # Localhost (nome)
                     ]
