@@ -390,27 +390,22 @@ class BikeJJGame {
         const segments = document.querySelectorAll(`#player${playerId} .segment`);
         const maxEnergy = this.maxEnergy;
         
+        console.log(`🔍 updateEnergySegments - Jogador ${playerId}, Energia: ${energy}, Max: ${maxEnergy}`);
+        console.log(`🔍 Segmentos encontrados:`, segments.length);
+        
         segments.forEach((segment, index) => {
             // Calcular energia necessária para cada segmento
             const segmentEnergy = (maxEnergy / 7) * (index + 1);
-            const previousSegmentEnergy = index > 0 ? (maxEnergy / 7) * index : 0;
             
             // Determinar estado baseado na energia atual
-            if (energy < previousSegmentEnergy) {
-                // Segmento completamente apagado
+            if (energy < segmentEnergy) {
+                // Segmento apagado
                 segment.className = `segment ${this.getSegmentColor(index)} off`;
-            } else if (energy >= segmentEnergy) {
-                // Segmento completamente ativo
-                segment.className = `segment ${this.getSegmentColor(index)} active`;
+                console.log(`🔍 Segmento ${index} (${this.getSegmentColor(index)}): OFF - Energia ${energy} < ${segmentEnergy.toFixed(2)}`);
             } else {
-                // Segmento em transição (interpolação na altura)
-                const progress = (energy - previousSegmentEnergy) / (segmentEnergy - previousSegmentEnergy);
-                segment.className = `segment ${this.getSegmentColor(index)} transitioning`;
-                
-                // Interpolação na altura: cresce de baixo para cima
-                const segmentHeight = 14.28; // Altura de cada segmento em %
-                const fillHeight = segmentHeight * progress;
-                segment.style.clipPath = `inset(${100 - fillHeight}% 0 0 0)`;
+                // Segmento ativo
+                segment.className = `segment ${this.getSegmentColor(index)} active`;
+                console.log(`🔍 Segmento ${index} (${this.getSegmentColor(index)}): ACTIVE - Energia ${energy} >= ${segmentEnergy.toFixed(2)}`);
             }
         });
     }
@@ -427,7 +422,6 @@ class BikeJJGame {
         segments.forEach((segment, index) => {
             // Aplicar cor baseada na posição e estado inicial apagado
             segment.className = `segment ${this.getSegmentColor(index)} off`;
-            segment.style.clipPath = 'inset(100% 0 0 0)'; // Completamente escondido
         });
     }
     

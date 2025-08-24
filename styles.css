@@ -192,21 +192,15 @@ header p {
 /* Estados das barras */
 .segment.off {
     background: #333 !important;
-    opacity: 1;
+    opacity: 0.3;
     animation: none;
-    clip-path: inset(100% 0 0 0); /* Completamente escondido */
 }
 
-.segment.transitioning {
-    opacity: 1; /* Sempre 100% opaco */
-    animation: none;
-    transition: clip-path 0.1s ease; /* Transição suave na altura */
-}
+/* Estado transitioning removido - voltamos para off/active simples */
 
 .segment.active {
     opacity: 1;
     animation: none;
-    clip-path: inset(0% 0 0 0); /* Completamente visível */
 }
 
 /* Animações - Simplificadas para barras sólidas */
