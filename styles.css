@@ -176,9 +176,12 @@ header p {
 }
 
 .segment {
-    height: 14.28%;
+    height: 0%; /* Começa com altura 0 */
     border-bottom: 2px solid rgba(255,255,255,0.5);
     box-shadow: inset 0 0 5px rgba(0,0,0,0.3);
+    transition: height 0.1s ease; /* Transição suave na altura */
+    position: relative;
+    bottom: 0; /* Garantir que cresça de baixo para cima */
 }
 
 .segment.red { background: #ff0000; } /* Vermelho - Baixo */
@@ -196,7 +199,12 @@ header p {
     animation: none;
 }
 
-/* Estado transitioning removido - voltamos para off/active simples */
+/* Estado growing para segmentos em transição */
+.segment.growing {
+    opacity: 1;
+    animation: none;
+    transition: height 0.1s ease;
+}
 
 .segment.active {
     opacity: 1;

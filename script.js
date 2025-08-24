@@ -396,16 +396,26 @@ class BikeJJGame {
         segments.forEach((segment, index) => {
             // Calcular energia necessária para cada segmento
             const segmentEnergy = (maxEnergy / 7) * (index + 1);
+            const previousSegmentEnergy = index > 0 ? (maxEnergy / 7) * index : 0;
             
             // Determinar estado baseado na energia atual
-            if (energy < segmentEnergy) {
-                // Segmento apagado
+            if (energy < previousSegmentEnergy) {
+                // Segmento completamente apagado
                 segment.className = `segment ${this.getSegmentColor(index)} off`;
-                console.log(`🔍 Segmento ${index} (${this.getSegmentColor(index)}): OFF - Energia ${energy} < ${segmentEnergy.toFixed(2)}`);
-            } else {
-                // Segmento ativo
+                segment.style.height = '0%';
+                console.log(`🔍 Segmento ${index} (${this.getSegmentColor(index)}): OFF - Altura 0%`);
+            } else if (energy >= segmentEnergy) {
+                // Segmento completamente ativo
                 segment.className = `segment ${this.getSegmentColor(index)} active`;
-                console.log(`🔍 Segmento ${index} (${this.getSegmentColor(index)}): ACTIVE - Energia ${energy} >= ${segmentEnergy.toFixed(2)}`);
+                segment.style.height = '14.28%';
+                console.log(`🔍 Segmento ${index} (${this.getSegmentColor(index)}): ACTIVE - Altura 100%`);
+            } else {
+                // Segmento em transição (crescendo)
+                const progress = (energy - previousSegmentEnergy) / (segmentEnergy - previousSegmentEnergy);
+                const height = 14.28 * progress; // Altura em %
+                segment.className = `segment ${this.getSegmentColor(index)} growing`;
+                segment.style.height = `${height}%`;
+                console.log(`🔍 Segmento ${index} (${this.getSegmentColor(index)}): CRESCENDO - Altura ${height.toFixed(2)}%`);
             }
         });
     }
