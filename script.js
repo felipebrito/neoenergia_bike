@@ -48,6 +48,9 @@ class BikeJJGame {
         this.setupVirtualLeds(); // Configurar LEDs virtuais
         this.updateDisplay();
         
+        // Sistema de polling para comandos externos da ESP32
+        this.setupExternalCommandPolling();
+        
         console.log('✅ BikeJJ Game inicializado com sucesso!');
         console.log('🎮 Estado inicial:', this.gameState);
     }
@@ -100,6 +103,71 @@ class BikeJJGame {
                 this.testLedStrobe(playerId);
             });
         });
+        
+        console.log('✅ LEDs virtuais configurados');
+    }
+    
+    // Sistema de polling para comandos externos da ESP32
+    setupExternalCommandPolling() {
+        console.log('🔌 Configurando polling para comandos ESP32...');
+        
+        // Polling a cada 100ms para verificar comandos externos
+        setInterval(() => {
+            this.checkExternalCommands();
+        }, 100);
+        
+        console.log('✅ Polling ESP32 configurado');
+    }
+    
+    // Verificar comandos externos da ESP32
+    async checkExternalCommands() {
+        try {
+            const response = await fetch('/api/commands', {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            if (response.ok) {
+                const commands = await response.json();
+                if (commands && commands.length > 0) {
+                    commands.forEach(command => {
+                        this.processExternalCommand(command);
+                    });
+                }
+            }
+        } catch (error) {
+            // Silenciar erros de polling para não poluir o console
+        }
+    }
+    
+    // Processar comando externo da ESP32
+    processExternalCommand(command) {
+        console.log('🔌 Comando externo recebido:', command);
+        
+        if (command.type === 'new_game') {
+            // Comando especial para iniciar nova partida
+            console.log('🔄 Iniciando nova partida via comando externo...');
+            this.newGame();
+            return;
+        }
+        
+        const { player_id, action, key } = command;
+        
+        if (player_id && action && key) {
+            // Simular evento de tecla
+            const keyEvent = new KeyboardEvent(action === 'keydown' ? 'keydown' : 'keyup', {
+                code: key,
+                key: key.toLowerCase(),
+                bubbles: true
+            });
+            
+            // Disparar evento no documento
+            document.dispatchEvent(keyEvent);
+            
+            console.log(`🎮 Simulando ${action} para ${key} (Jogador ${player_id})`);
+        }
     }
     
     // Atualizar taxa de strobe nos LEDs

@@ -12,10 +12,14 @@ import webbrowser
 import threading
 import json
 import time
+from collections import deque
 from urllib.parse import urlparse
 from udp_server import start_udp_server
 
-PORT = 8001
+PORT = 8002
+
+# Fila global de comandos externos da ESP32
+external_commands = deque(maxlen=100)
 
 class BikeJJHandler(http.server.SimpleHTTPRequestHandler):
     def end_headers(self):
@@ -27,15 +31,38 @@ class BikeJJHandler(http.server.SimpleHTTPRequestHandler):
         super().end_headers()
     
     def do_GET(self):
+        # Endpoint para consultar comandos externos da ESP32
+        if self.path == '/api/commands':
+            try:
+                # Retornar todos os comandos pendentes
+                commands = list(external_commands)
+                external_commands.clear()  # Limpar após enviar
+                
+                self.send_response(200)
+                self.send_header('Content-type', 'application/json')
+                self.end_headers()
+                response = json.dumps(commands)
+                self.wfile.write(response.encode('utf-8'))
+                
+            except Exception as e:
+                print(f"❌ Erro ao consultar comandos: {e}")
+                self.send_response(500)
+                self.send_header('Content-type', 'application/json')
+                self.end_headers()
+                response = json.dumps({"status": "error", "message": str(e)})
+                self.wfile.write(response.encode('utf-8'))
+        
         # Servir arquivos estáticos
-        if self.path == '/':
+        elif self.path == '/':
             self.path = '/index.html'
-        return super().do_GET()
+            return super().do_GET()
+        else:
+            return super().do_GET()
     
     def do_POST(self):
-        # Endpoint para envio de dados UDP
-        if self.path == '/api/udp':
-            try:
+        try:
+            # Endpoint para envio de dados UDP
+            if self.path == '/api/udp':
                 content_length = int(self.headers['Content-Length'])
                 post_data = self.rfile.read(content_length)
                 data = json.loads(post_data.decode('utf-8'))
@@ -73,49 +100,75 @@ class BikeJJHandler(http.server.SimpleHTTPRequestHandler):
                 
             # Endpoint para comandos de tecla da ESP32
             elif self.path == '/api/key':
+                content_length = int(self.headers['Content-Length'])
+                post_data = self.rfile.read(content_length)
+                data = json.loads(post_data.decode('utf-8'))
+                
+                print(f"🎮 Comando de tecla recebido: {data}")
+                
+                # Adicionar comando à fila para o frontend processar
+                if data.get('type') == 'key_command':
+                    key = data.get('key')
+                    action = data.get('action')
+                    player_id = data.get('player_id')
+                    
+                    command = {
+                        'player_id': player_id,
+                        'action': action,
+                        'key': key,
+                        'timestamp': time.time()
+                    }
+                    
+                    external_commands.append(command)
+                    print(f"🎯 Comando adicionado à fila: {action} da tecla {key} para Jogador {player_id}")
+                    
+                # Resposta de sucesso
+                self.send_response(200)
+                self.send_header('Content-type', 'application/json')
+                self.end_headers()
+                response = json.dumps({"status": "success", "key_command": "queued"})
+                self.wfile.write(response.encode('utf-8'))
+                
+            # Endpoint para iniciar nova partida
+            elif self.path == '/api/new-game':
                 try:
-                    content_length = int(self.headers['Content-Length'])
-                    post_data = self.rfile.read(content_length)
-                    data = json.loads(post_data.decode('utf-8'))
+                    print("🔄 Comando para iniciar nova partida recebido")
                     
-                    print(f"🎮 Comando de tecla recebido: {data}")
+                    # Adicionar comando especial à fila
+                    command = {
+                        'type': 'new_game',
+                        'timestamp': time.time()
+                    }
                     
-                    # Simular evento de tecla
-                    if data.get('type') == 'key_command':
-                        key = data.get('key')
-                        action = data.get('action')
-                        player_id = data.get('player_id')
-                        
-                        print(f"🎯 Simulando {action} da tecla {key} para Jogador {player_id}")
-                        
-                        # Aqui você pode implementar a lógica para simular o evento de tecla
-                        # Por enquanto, apenas logamos
-                        
+                    external_commands.append(command)
+                    print("🎯 Comando de nova partida adicionado à fila")
+                    
                     # Resposta de sucesso
                     self.send_response(200)
                     self.send_header('Content-type', 'application/json')
                     self.end_headers()
-                    response = json.dumps({"status": "success", "key_command": "processed"})
+                    response = json.dumps({"status": "success", "new_game": "queued"})
                     self.wfile.write(response.encode('utf-8'))
                     
                 except Exception as e:
-                    print(f"❌ Erro no comando de tecla: {e}")
+                    print(f"❌ Erro ao processar nova partida: {e}")
                     self.send_response(500)
                     self.send_header('Content-type', 'application/json')
                     self.end_headers()
                     response = json.dumps({"status": "error", "message": str(e)})
                     self.wfile.write(response.encode('utf-8'))
                 
-            except Exception as e:
-                print(f"❌ Erro no POST: {e}")
-                self.send_response(500)
-                self.send_header('Content-type', 'application/json')
+            else:
+                self.send_response(404)
                 self.end_headers()
-                response = json.dumps({"status": "error", "message": str(e)})
-                self.wfile.write(response.encode('utf-8'))
-        else:
-            self.send_response(404)
+                
+        except Exception as e:
+            print(f"❌ Erro no POST: {e}")
+            self.send_response(500)
+            self.send_header('Content-type', 'application/json')
             self.end_headers()
+            response = json.dumps({"status": "error", "message": str(e)})
+            self.wfile.write(response.encode('utf-8'))
 
 def main():
     # Mudar para o diretório do projeto
