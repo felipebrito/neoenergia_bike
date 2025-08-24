@@ -178,7 +178,6 @@ header p {
 
 .segment {
     height: 0%; /* Começa com altura 0 */
-    border-bottom: 2px solid rgba(255,255,255,0.5);
     box-shadow: inset 0 0 5px rgba(0,0,0,0.3);
     transition: height 0.1s ease; /* Transição suave na altura */
     position: relative;
@@ -462,6 +461,7 @@ header p {
         inset 0 0 40px rgba(255, 215, 0, 0.6);
     position: relative;
     overflow: hidden;
+    animation: winnerBarStrobe 0.2s ease-in-out infinite alternate;
 }
 
 .energy-bar.winner::before {
@@ -537,6 +537,22 @@ header p {
     }
     100% { 
         background-position: 8px 0; 
+    }
+}
+
+@keyframes winnerBarStrobe {
+    0% { 
+        filter: brightness(1) saturate(1);
+        box-shadow: 
+            inset 0 0 20px rgba(255, 215, 0, 0.8),
+            inset 0 0 40px rgba(255, 215, 0, 0.6);
+    }
+    100% { 
+        filter: brightness(1.5) saturate(1.5);
+        box-shadow: 
+            inset 0 0 30px rgba(255, 215, 0, 1),
+            inset 0 0 60px rgba(255, 215, 0, 0.8),
+            0 0 20px rgba(255, 215, 0, 0.6);
     }
 }
 
