@@ -71,6 +71,41 @@ class BikeJJHandler(http.server.SimpleHTTPRequestHandler):
                 response = json.dumps({"status": "success"})
                 self.wfile.write(response.encode('utf-8'))
                 
+            # Endpoint para comandos de tecla da ESP32
+            elif self.path == '/api/key':
+                try:
+                    content_length = int(self.headers['Content-Length'])
+                    post_data = self.rfile.read(content_length)
+                    data = json.loads(post_data.decode('utf-8'))
+                    
+                    print(f"🎮 Comando de tecla recebido: {data}")
+                    
+                    # Simular evento de tecla
+                    if data.get('type') == 'key_command':
+                        key = data.get('key')
+                        action = data.get('action')
+                        player_id = data.get('player_id')
+                        
+                        print(f"🎯 Simulando {action} da tecla {key} para Jogador {player_id}")
+                        
+                        # Aqui você pode implementar a lógica para simular o evento de tecla
+                        # Por enquanto, apenas logamos
+                        
+                    # Resposta de sucesso
+                    self.send_response(200)
+                    self.send_header('Content-type', 'application/json')
+                    self.end_headers()
+                    response = json.dumps({"status": "success", "key_command": "processed"})
+                    self.wfile.write(response.encode('utf-8'))
+                    
+                except Exception as e:
+                    print(f"❌ Erro no comando de tecla: {e}")
+                    self.send_response(500)
+                    self.send_header('Content-type', 'application/json')
+                    self.end_headers()
+                    response = json.dumps({"status": "error", "message": str(e)})
+                    self.wfile.write(response.encode('utf-8'))
+                
             except Exception as e:
                 print(f"❌ Erro no POST: {e}")
                 self.send_response(500)
