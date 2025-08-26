@@ -2,7 +2,6 @@
 """
 Servidor HTTP simples para o BikeJJ
 Resolve problemas de persistência e CORS
-Inclui servidor UDP para comunicação com ESP32
 """
 
 import http.server
@@ -14,7 +13,6 @@ import json
 import time
 from collections import deque
 from urllib.parse import urlparse
-from udp_server import start_udp_server
 
 PORT = 8002
 
@@ -61,156 +59,75 @@ class BikeJJHandler(http.server.SimpleHTTPRequestHandler):
     
     def do_POST(self):
         try:
-            # Endpoint para envio de dados UDP
-            if self.path == '/api/udp':
+            # Endpoint para receber comandos de teclas da ESP32
+            if self.path == '/api/key':
                 content_length = int(self.headers['Content-Length'])
                 post_data = self.rfile.read(content_length)
                 data = json.loads(post_data.decode('utf-8'))
                 
-                print(f"📨 POST recebido: {data}")
+                print(f"🎮 Comando recebido: {data}")
                 
-                # Processar comando UDP
-                try:
-                    from udp_server import udp_server
-                    
-                    if udp_server and udp_server.is_running:
-                        if data.get('type') == 'winner':
-                            print(f"🏆 Enviando vencedor: {data.get('player_id')}")
-                            udp_server.send_winner(data.get('player_id'))
-                        elif data.get('type') == 'reset':
-                            print("🔄 Enviando reset do jogo")
-                            udp_server.send_game_reset()
-                        elif data.get('type') == 'test':
-                            print(f"🧪 Enviando mensagem de teste: {data.get('player_id')}")
-                            udp_server.send_test_message(data.get('player_id'))
-                        else:
-                            print(f"⚠️ Tipo de mensagem desconhecido: {data.get('type')}")
-                    else:
-                        print("❌ Servidor UDP não está rodando")
-                        
-                except Exception as udp_error:
-                    print(f"❌ Erro no servidor UDP: {udp_error}")
+                # Adicionar comando à fila
+                external_commands.append(data)
                 
                 # Resposta de sucesso
                 self.send_response(200)
                 self.send_header('Content-type', 'application/json')
                 self.end_headers()
-                response = json.dumps({"status": "success"})
+                response = json.dumps({"status": "success", "message": "Comando recebido"})
                 self.wfile.write(response.encode('utf-8'))
-                
-            # Endpoint para comandos de tecla da ESP32
-            elif self.path == '/api/key':
-                content_length = int(self.headers['Content-Length'])
-                post_data = self.rfile.read(content_length)
-                data = json.loads(post_data.decode('utf-8'))
-                
-                print(f"🎮 Comando de tecla recebido: {data}")
-                
-                # Adicionar comando à fila para o frontend processar
-                if data.get('type') == 'key_command':
-                    key = data.get('key')
-                    action = data.get('action')
-                    player_id = data.get('player_id')
-                    
-                    command = {
-                        'player_id': player_id,
-                        'action': action,
-                        'key': key,
-                        'timestamp': time.time()
-                    }
-                    
-                    external_commands.append(command)
-                    print(f"🎯 Comando adicionado à fila: {action} da tecla {key} para Jogador {player_id}")
-                    
-                # Resposta de sucesso
-                self.send_response(200)
-                self.send_header('Content-type', 'application/json')
-                self.end_headers()
-                response = json.dumps({"status": "success", "key_command": "queued"})
-                self.wfile.write(response.encode('utf-8'))
-                
+            
             # Endpoint para iniciar nova partida
             elif self.path == '/api/new-game':
-                try:
-                    print("🔄 Comando para iniciar nova partida recebido")
-                    
-                    # Adicionar comando especial à fila
-                    command = {
-                        'type': 'new_game',
-                        'timestamp': time.time()
-                    }
-                    
-                    external_commands.append(command)
-                    print("🎯 Comando de nova partida adicionado à fila")
-                    
-                    # Resposta de sucesso
-                    self.send_response(200)
-                    self.send_header('Content-type', 'application/json')
-                    self.end_headers()
-                    response = json.dumps({"status": "success", "new_game": "queued"})
-                    self.wfile.write(response.encode('utf-8'))
-                    
-                except Exception as e:
-                    print(f"❌ Erro ao processar nova partida: {e}")
-                    self.send_response(500)
-                    self.send_header('Content-type', 'application/json')
-                    self.end_headers()
-                    response = json.dumps({"status": "error", "message": str(e)})
-                    self.wfile.write(response.encode('utf-8'))
+                content_length = int(self.headers['Content-Length'])
+                post_data = self.rfile.read(content_length)
+                data = json.loads(post_data.decode('utf-8'))
+                
+                print(f"🆕 Nova partida solicitada: {data}")
+                
+                # Adicionar comando de nova partida à fila
+                external_commands.append({"type": "new_game"})
+                
+                # Resposta de sucesso
+                self.send_response(200)
+                self.send_header('Content-type', 'application/json')
+                self.end_headers()
+                response = json.dumps({"status": "success", "message": "Nova partida iniciada"})
+                self.wfile.write(response.encode('utf-8'))
                 
             else:
                 self.send_response(404)
                 self.end_headers()
                 
         except Exception as e:
-            print(f"❌ Erro no POST: {e}")
+            print(f"❌ Erro ao processar POST: {e}")
             self.send_response(500)
             self.send_header('Content-type', 'application/json')
             self.end_headers()
             response = json.dumps({"status": "error", "message": str(e)})
             self.wfile.write(response.encode('utf-8'))
 
-def main():
-    # Mudar para o diretório do projeto
-    os.chdir(os.path.dirname(os.path.abspath(__file__)))
-    
-    print("🔧 Iniciando BikeJJ Server...")
-    
+def start_server():
+    """Iniciar o servidor HTTP"""
     try:
-        # Iniciar servidor UDP em thread separada
-        print("📡 Iniciando servidor UDP...")
-        udp_thread = threading.Thread(target=start_udp_server, daemon=True)
-        udp_thread.start()
-        
-        # Aguardar um pouco para o UDP inicializar
-        time.sleep(1)
-        
-        # Verificar se o UDP está rodando
-        from udp_server import udp_server
-        if udp_server and udp_server.is_running:
-            print("✅ Servidor UDP iniciado com sucesso!")
-        else:
-            print("⚠️ Servidor UDP pode não estar funcionando corretamente")
-        
-    except Exception as e:
-        print(f"❌ Erro ao iniciar servidor UDP: {e}")
-    
-    # Criar servidor HTTP
-    with socketserver.TCPServer(("", PORT), BikeJJHandler) as httpd:
-        print(f"🚴 BikeJJ Server rodando em http://localhost:{PORT}")
-        print(f"📡 Servidor UDP rodando na porta 8887")
-        print(f"📁 Diretório: {os.getcwd()}")
-        print("🌐 Abrindo no navegador...")
-        print("⏹️  Pressione Ctrl+C para parar os servidores")
-        
-        # Abrir no navegador
-        webbrowser.open(f'http://localhost:{PORT}')
-        
-        try:
+        with socketserver.TCPServer(("", PORT), BikeJJHandler) as httpd:
+            print(f"🚀 Servidor BikeJJ rodando em http://localhost:{PORT}")
+            print(f"📡 Endpoints disponíveis:")
+            print(f"   GET  /api/commands     - Consultar comandos externos")
+            print(f"   POST /api/key          - Receber comandos de teclas")
+            print(f"   POST /api/new-game     - Iniciar nova partida")
+            print(f"🌐 Abrindo navegador...")
+            
+            # Abrir navegador automaticamente
+            webbrowser.open(f'http://localhost:{PORT}')
+            
+            # Manter servidor rodando
             httpd.serve_forever()
-        except KeyboardInterrupt:
-            print("\n🛑 Servidores parados!")
-            httpd.shutdown()
+            
+    except KeyboardInterrupt:
+        print("\n🛑 Servidor parado pelo usuário")
+    except Exception as e:
+        print(f"❌ Erro ao iniciar servidor: {e}")
 
 if __name__ == "__main__":
-    main()
+    start_server()
