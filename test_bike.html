@@ -170,6 +170,7 @@
                 this.energy = 0;
                 this.bikePosition = 50;
                 this.maxEnergy = 100;
+                this.debugCounter = 0;
                 
                 this.bike = document.getElementById('bike');
                 this.console = document.getElementById('console');
@@ -178,7 +179,12 @@
                 this.energyFill = document.getElementById('energyFill');
                 
                 this.setupEventListeners();
-                this.setupWebSocket();
+                this.startPolling();
+                
+                // AUTO-INICIAR JOGO APÓS 2 SEGUNDOS
+                setTimeout(() => {
+                    this.startGame();
+                }, 2000);
             }
             
             setupEventListeners() {
@@ -191,6 +197,16 @@
                 this.status.textContent = '🎮 Jogo Ativo - Pedale!';
                 document.getElementById('startBtn').disabled = true;
                 this.log('🎮 Jogo iniciado! Pedale na bicicleta...');
+                
+                // ATIVAR JOGO NO SERVIDOR
+                fetch('/api/start-game')
+                    .then(response => response.text())
+                    .then(data => {
+                        this.log('✅ Jogo ativado no servidor!');
+                    })
+                    .catch(error => {
+                        this.log('❌ Erro ao ativar jogo: ' + error);
+                    });
             }
             
             resetGame() {
@@ -217,6 +233,12 @@
                     const response = await fetch('/api/state');
                     const gameState = await response.json();
                     
+                    // Debug: mostrar estado atual a cada 5 segundos
+                    if (this.debugCounter % 50 === 0) { // A cada 5 segundos
+                        this.log(`🔍 Estado: Jogo=${gameState.game_active}, Energia=${gameState.player1_energy}, Pedalando=${gameState.is_pedaling || 'N/A'}`);
+                    }
+                    this.debugCounter++;
+                    
                     // Atualizar energia do jogador 1
                     if (gameState.player1_energy !== this.energy) {
                         const oldEnergy = this.energy;
@@ -232,7 +254,7 @@
                         this.updateDisplay();
                     }
                 } catch (error) {
-                    // Silenciar erros de polling
+                    this.log('❌ Erro no polling: ' + error);
                 }
             }
             

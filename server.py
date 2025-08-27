@@ -21,7 +21,10 @@ game_state = {
     'player1_energy': 0,
     'game_active': False,
     'pedal_count': 0,
-    'is_pedaling': False
+    'is_pedaling': False,
+    'inactivity_count': 0,  # Contador de mensagens de inatividade
+    'last_pedal_time': 0,   # Timestamp da última pedalada real
+    'inactivity_timer': 0   # Timer de inatividade baseado em tempo
 }
 
 class ESP32Reader:
@@ -63,11 +66,29 @@ class ESP32Reader:
         # CAPTURAR PEDALADA: TRUE/FALSE (mesma lógica das teclas QWER)
         if "Pedalada: True" in line:
             game_state['is_pedaling'] = True
-            print(f"✅ ESP32: Pedalando = True")
+            game_state['inactivity_count'] = 0  # Resetar contador de inatividade
+            print(f"✅ ESP32: Pedalando = True - Resetando contador de inatividade")
             
         elif "Pedalada: False" in line:
             game_state['is_pedaling'] = False
-            print(f"🛑 ESP32: Pedalando = False (Inatividade)")
+            game_state['inactivity_count'] += 1  # Incrementar contador de mensagens
+            
+            # LÓGICA BASEADA EM TEMPO REAL: Se passou 2 segundos sem pedalada, diminuir energia
+            current_time = time.time()
+            time_since_last_pedal = current_time - game_state['last_pedal_time']
+            
+            if time_since_last_pedal >= 0.5 and game_state['game_active']:  # 0.5 segundos de inatividade (mais rápido)
+                if game_state['player1_energy'] > 0:
+                    # Usar taxa de decaimento das configurações (padrão: 2.5% por segundo)
+                    decay_rate = 2.5  # Taxa padrão do menu
+                    energy_to_decay = (decay_rate * 0.5)  # Decaimento para 0.5 segundos
+                    game_state['player1_energy'] = max(0, game_state['player1_energy'] - energy_to_decay)
+                    print(f"🛑 ESP32: Inatividade por {time_since_last_pedal:.1f}s - Energia diminuindo: {energy_to_decay:.1f}% (Taxa: {decay_rate}%/s)")
+                    game_state['last_pedal_time'] = current_time  # Resetar timer
+                else:
+                    print(f"🛑 ESP32: Inatividade por {time_since_last_pedal:.1f}s - Energia já está em 0%")
+            else:
+                print(f"🛑 ESP32: Pedalada: False (Inatividade #{game_state['inactivity_count']} - Tempo: {time_since_last_pedal:.1f}s)")
             
         # CAPTURAR INTERRUPÇÕES DE SENSOR PARA ENERGIA
         elif "🔍 Interrupção: Sensor HIGH" in line:
@@ -83,6 +104,12 @@ class ESP32Reader:
                         game_state['player1_energy'] += 3.0
                         if game_state['player1_energy'] > 100:
                             game_state['player1_energy'] = 100
+                        print(f"🚴 PEDALADA #{pedal_num} - Energia: {game_state['player1_energy']:.1f}%")
+                    else:
+                        # JOGO SEMPRE DISPONÍVEL - iniciar automaticamente com primeira pedalada
+                        game_state['game_active'] = True
+                        game_state['player1_energy'] = 3.0
+                        print(f"🎮 Jogo iniciado automaticamente com pedalada #{pedal_num}!")
                         print(f"🚴 PEDALADA #{pedal_num} - Energia: {game_state['player1_energy']:.1f}%")
                         
             except Exception as e:

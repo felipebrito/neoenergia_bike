@@ -125,22 +125,58 @@ class BikeJJGame {
                 // Atualizar status do ESP32
                 this.updateESP32Status(true);
                 
-                // Atualizar display
-                this.updateDisplay();
-                
-                // Verificar vitória
+                        // Atualizar display
+        this.updateDisplay();
+        
+        // RESETAR BARRAS VISUAIS APÓS ATUALIZAÇÃO
+        this.players.forEach(player => {
+            const playerBar = document.getElementById(`player${player.id}`);
+            if (playerBar) {
+                const energyFill = playerBar.querySelector('.energy-fill');
+                if (energyFill && player.energy === 0) {
+                    energyFill.style.width = '0%';
+                }
+            }
+        });
+        
+        // Verificar vitória
                 if (gameState.player1_energy >= 100 && this.gameState !== 'finished') {
                     console.log('🏆 VITÓRIA! Jogador 1 chegou a 100% de energia!');
+                    console.log(`🔍 Debug: Energia=${gameState.player1_energy}, Estado=${this.gameState}`);
                     this.declareWinner(1);
                     return; // Parar processamento
+                } else if (gameState.player1_energy >= 100) {
+                    console.log(`⚠️ Energia 100% mas jogo já finalizado. Estado: ${this.gameState}`);
+                }
+                
+                // Verificar vitória de outros jogadores também
+                for (let i = 1; i < this.players.length; i++) {
+                    if (this.players[i].energy >= 100 && this.gameState !== 'finished') {
+                        console.log(`🏆 VITÓRIA! Jogador ${i + 1} chegou a 100% de energia!`);
+                        this.declareWinner(i + 1);
+                        return; // Parar processamento
+                    }
+                }
+                
+                // JOGO SEMPRE DISPONÍVEL - detectar quando jogo é iniciado automaticamente
+                if (gameState.game_active && this.gameState === 'waiting') {
+                    console.log('🎮 Jogo iniciado automaticamente com pedalada!');
+                    this.gameState = 'playing';
+                    this.showMessage('🎮 Jogo iniciado automaticamente! Pedale para ganhar!');
                 }
             }
             
-                            // Debug: mostrar estado atual a cada 5 segundos
+                                                    // Debug: mostrar estado atual a cada 5 segundos
                 if (this.debugCounter % 100 === 0) { // A cada 5 segundos (100 * 50ms)
-                    console.log(`🔍 Estado: Jogo=${this.gameState}, Energia=${this.players[0].energy}, Pedalando=${this.players[0].isPedaling}, ÚltimaPedalada=${Math.round((Date.now() - this.players[0].lastPedalTime)/1000)}s atrás`);
+                    console.log(`🔍 Estado: Jogo=${this.gameState}, Energia=${this.players[0].energy}, Pedalando=${this.players[0].isPedaling}, Inatividade=${gameState.inactivity_count || 0} mensagens`);
+                    console.log(`🔍 Servidor: Energia=${gameState.player1_energy}, JogoAtivo=${gameState.game_active}`);
                 }
                 this.debugCounter++;
+                
+                // 🚨 LOG DE INATIVIDADE (sem contador visual)
+                if (gameState.inactivity_count !== undefined && gameState.inactivity_count > 0) {
+                    console.log(`🚨 INATIVIDADE #${gameState.inactivity_count} mensagens - ESP32 enviou "Pedalada: False"`);
+                }
                 
                 // LÓGICA SIMPLES: O servidor já envia is_pedaling = true/false
                 // Não precisa de lógica complexa aqui
@@ -761,6 +797,10 @@ class BikeJJGame {
         if (player) {
             console.log(`🏆 Vitória declarada para jogador ${playerId}!`);
             
+            // CONGELAR TODOS OS JOGADORES - parar todas as atividades
+            this.freezeAllPlayers();
+            console.log('❄️ Todos os jogadores congelados - Jogo finalizado');
+            
             // Parar timer de decaimento
             this.stopEnergyDecay();
             console.log('⏰ Timer de decaimento parado - Jogo finalizado');
@@ -810,6 +850,25 @@ class BikeJJGame {
         
         // Iniciar contador de reinício automático
         this.startAutoRestartCountdown();
+        
+        // Reiniciar jogo automaticamente após 8 segundos (tempo para animação completa)
+        setTimeout(() => {
+            console.log('🔄 Reiniciando jogo automaticamente após animação...');
+            this.showMessage('🔄 Reiniciando jogo em 3...');
+            
+            // Contador regressivo
+            setTimeout(() => {
+                this.showMessage('🔄 Reiniciando jogo em 2...');
+                setTimeout(() => {
+                    this.showMessage('🔄 Reiniciando jogo em 1...');
+                    setTimeout(() => {
+                        console.log('🔄 Executando RESET COMPLETO automático...');
+                        this.completeReset();
+                        this.showMessage('🎮 Jogo reiniciado completamente! Qualquer pedalada inicia uma nova partida!');
+                    }, 1000);
+                }, 1000);
+            }, 1000);
+        }, 8000);
     }
     
     applyWinnerEffects(winnerId) {
@@ -1132,41 +1191,10 @@ class BikeJJGame {
     }
     
     resetGame() {
-        this.gameState = 'waiting';
+        console.log('🔄 Iniciando RESET COMPLETO...');
         
-        // RESETAR JOGO NO SERVIDOR
-        fetch('/api/reset-game')
-            .then(response => response.text())
-            .then(data => {
-                console.log('🔄 Jogo resetado no servidor!');
-            })
-            .catch(error => {
-                console.log('❌ Erro ao resetar jogo: ' + error);
-            });
-        
-        // Parar decaimento de energia
-        this.stopEnergyDecay();
-        
-        // Cancelar timer automático se estiver rodando
-        if (this.autoRestartTimer) {
-            clearInterval(this.autoRestartTimer);
-            this.autoRestartTimer = null;
-        }
-        
-        this.players.forEach(player => {
-            player.energy = 0;
-            player.score = 0;
-            player.isPedaling = false;
-        });
-        
-        document.getElementById('startBtn').disabled = false;
-        document.getElementById('startBtn').textContent = 'Iniciar Jogo';
-        
-        // Remover efeitos de vencedor
-        this.removeWinnerEffects();
-        
-        this.updateDisplay();
-        this.showMessage('Jogo reiniciado!');
+        // EXECUTAR RESET COMPLETO QUE GARANTE ESTADO INICIAL
+        this.completeReset();
     }
     
     removeWinnerEffects() {
@@ -1192,6 +1220,10 @@ class BikeJJGame {
             playerScore.classList.remove('loser');
             playerStatus.classList.remove('loser');
             
+            // REMOVER CLASSES DE CONGELAMENTO
+            playerBar.classList.remove('frozen');
+            energyFill.classList.remove('frozen');
+            
             // Restaurar nome e pontuação
             playerName.innerHTML = playerName.textContent.replace(/👑 /g, '').replace(/ 👑/g, '');
             playerName.style.color = '';
@@ -1199,6 +1231,12 @@ class BikeJJGame {
             
             playerScore.style.animation = '';
             playerScore.style.transform = '';
+            
+            // RESETAR BARRA DE ENERGIA VISUALMENTE
+            if (energyFill) {
+                energyFill.style.width = '0%';
+                console.log(`🔄 Barra visual do Jogador ${player.id} resetada para 0%`);
+            }
         });
     }
     
@@ -1410,6 +1448,507 @@ class BikeJJGame {
         if (minutes > 0) return `${minutes} minuto(s) atrás`;
         return 'agora mesmo';
     }
+    
+    // ❄️ CONGELAR TODOS OS JOGADORES
+    freezeAllPlayers() {
+        console.log('❄️ CONGELANDO TODOS OS JOGADORES...');
+        
+        this.players.forEach(player => {
+            // Parar todas as atividades
+            player.isPedaling = false;
+            player.lastPedalTime = 0;
+            
+            // CONGELAR BARRAS VISUALMENTE - adicionar classe de congelamento
+            const playerBar = document.getElementById(`player${player.id}`);
+            if (playerBar) {
+                playerBar.classList.add('frozen');
+                const energyFill = playerBar.querySelector('.energy-fill');
+                if (energyFill) {
+                    energyFill.classList.add('frozen');
+                    console.log(`❄️ Barra do Jogador ${player.id} congelada visualmente`);
+                }
+            }
+            
+            // Desabilitar controles de teclado
+            if (player.id === 1) {
+                // Jogador 1 (ESP32) - parar decaimento
+                this.stopEnergyDecay();
+            }
+            
+            console.log(`❄️ Jogador ${player.id} congelado - atividades paradas`);
+        });
+        
+        // Parar todos os timers ativos
+        if (this.decayTimer) {
+            clearInterval(this.decayTimer);
+            this.decayTimer = null;
+        }
+        
+        // Marcar jogo como finalizado
+        this.gameState = 'finished';
+        console.log('❄️ Jogo marcado como finalizado - congelamento completo');
+    }
+    
+    // 🔄 RESETAR TODAS AS BARRAS VISUAIS
+    resetAllEnergyBars() {
+        console.log('🔄 RESETANDO TODAS AS BARRAS VISUAIS...');
+        
+        this.players.forEach(player => {
+            const playerBar = document.getElementById(`player${player.id}`);
+            if (playerBar) {
+                // REMOVER CLASSE DE CONGELAMENTO
+                playerBar.classList.remove('frozen');
+                
+                const energyFill = playerBar.querySelector('.energy-fill');
+                if (energyFill) {
+                    // REMOVER CLASSE DE CONGELAMENTO
+                    energyFill.classList.remove('frozen');
+                    
+                    // FORÇAR RESET VISUAL
+                    energyFill.style.width = '0%';
+                    energyFill.style.transition = 'none'; // Sem animação
+                    
+                    // Forçar reflow para aplicar mudança imediatamente
+                    energyFill.offsetHeight;
+                    
+                    console.log(`🔄 Barra visual do Jogador ${player.id} resetada para 0%`);
+                }
+            }
+        });
+        
+        console.log('🔄 Todas as barras foram resetadas visualmente');
+    }
+    
+    // 🔄 FORÇAR RESET NO SERVIDOR
+    forceServerReset() {
+        console.log('🔄 Forçando reset no servidor...');
+        
+        // Resetar energia no servidor
+        fetch('/api/reset-game')
+            .then(response => response.text())
+            .then(data => {
+                console.log('🔄 Reset forçado no servidor executado!');
+                
+                // Verificar se o reset funcionou
+                setTimeout(() => {
+                    this.verifyServerReset();
+                }, 200);
+            })
+            .catch(error => {
+                console.log('❌ Erro no reset forçado: ' + error);
+            });
+    }
+    
+    // 🔍 VERIFICAR SE O RESET NO SERVIDOR FUNCIONOU
+    verifyServerReset() {
+        fetch('/api/state')
+            .then(response => response.json())
+            .then(gameState => {
+                console.log('🔍 Verificando reset do servidor...');
+                console.log(`🔍 Estado do servidor: Jogo=${gameState.game_active}, Energia=${gameState.player1_energy}`);
+                
+                if (gameState.player1_energy > 0) {
+                    console.log('⚠️ Servidor ainda não foi resetado! Forçando novamente...');
+                    this.forceServerReset();
+                } else {
+                    console.log('✅ Servidor resetado com sucesso!');
+                }
+            })
+            .catch(error => {
+                console.log('❌ Erro ao verificar reset: ' + error);
+            });
+    }
+    
+    // 🚀 FORÇAR RESET IMEDIATO NO DOM
+    forceDOMReset() {
+        console.log('🚀 Forçando reset imediato no DOM...');
+        
+        // Resetar todas as barras de energia diretamente
+        for (let i = 1; i <= 4; i++) {
+            const playerBar = document.getElementById(`player${i}`);
+            if (playerBar) {
+                // Resetar barra de energia
+                const energyFill = playerBar.querySelector('.energy-fill');
+                if (energyFill) {
+                    energyFill.style.cssText = `
+                        width: 0% !important;
+                        transition: none !important;
+                        opacity: 1 !important;
+                    `;
+                    console.log(`🚀 Barra do Jogador ${i} resetada no DOM (forçado)`);
+                }
+                
+                // Resetar status
+                const playerStatus = playerBar.querySelector('.player-status');
+                if (playerStatus) {
+                    playerStatus.textContent = 'Parado';
+                    playerStatus.style.color = '#cccccc';
+                }
+                
+                // Resetar pontuação
+                const playerScore = playerBar.querySelector('.player-score');
+                if (playerScore) {
+                    playerScore.textContent = '0';
+                }
+                
+                // Remover todas as classes especiais
+                playerBar.className = 'player-bar';
+                if (energyFill) {
+                    energyFill.className = 'energy-fill';
+                }
+            }
+        }
+        
+        // Forçar reflow do DOM
+        document.body.offsetHeight;
+        console.log('🚀 Reset do DOM executado com sucesso!');
+    }
+    
+    // 🔥 RESET FINAL - GARANTIR TUDO
+    forceFinalReset() {
+        console.log('🔥 EXECUTANDO RESET FINAL - GARANTINDO TUDO...');
+        
+        // 1. RESETAR VALORES INTERNOS
+        this.players.forEach(player => {
+            player.energy = 0;
+            player.score = 0;
+            player.isPedaling = false;
+            player.lastPedalTime = 0;
+            console.log(`🔥 Jogador ${player.id} resetado internamente`);
+        });
+        
+        // 2. RESETAR BARRAS VISUAIS COM FORÇA MÁXIMA
+        for (let i = 1; i <= 4; i++) {
+            const playerBar = document.getElementById(`player${i}`);
+            if (playerBar) {
+                // Resetar barra de energia com !important
+                const energyFill = playerBar.querySelector('.energy-fill');
+                if (energyFill) {
+                    energyFill.setAttribute('style', 'width: 0% !important; transition: none !important;');
+                    console.log(`🔥 Barra do Jogador ${i} resetada com força máxima`);
+                }
+                
+                // Resetar status
+                const playerStatus = playerBar.querySelector('.player-status');
+                if (playerStatus) {
+                    playerStatus.textContent = 'Parado';
+                    playerStatus.style.color = '#cccccc';
+                }
+                
+                // Resetar pontuação
+                const playerScore = playerBar.querySelector('.player-score');
+                if (playerScore) {
+                    playerScore.textContent = '0';
+                }
+                
+                // Remover TODAS as classes
+                playerBar.className = 'player-bar';
+                if (energyFill) {
+                    energyFill.className = 'energy-fill';
+                }
+            }
+        }
+        
+        // 3. RESETAR ESTADO DO JOGO
+        this.gameState = 'waiting';
+        
+        // 4. FORÇAR REFLOW E VERIFICAR
+        document.body.offsetHeight;
+        
+        // 5. VERIFICAÇÃO FINAL
+        this.verifyFinalReset();
+        
+        console.log('🔥 RESET FINAL EXECUTADO COM SUCESSO!');
+    }
+    
+    // 🔍 VERIFICAÇÃO FINAL DO RESET
+    verifyFinalReset() {
+        console.log('🔍 VERIFICAÇÃO FINAL DO RESET...');
+        
+        let allReset = true;
+        
+        // Verificar valores internos
+        this.players.forEach(player => {
+            if (player.energy !== 0 || player.isPedaling !== false) {
+                console.log(`⚠️ Jogador ${player.id} não foi resetado completamente!`);
+                allReset = false;
+            }
+        });
+        
+        // Verificar barras visuais
+        for (let i = 1; i <= 4; i++) {
+            const playerBar = document.getElementById(`player${i}`);
+            if (playerBar) {
+                const energyFill = playerBar.querySelector('.energy-fill');
+                if (energyFill) {
+                    const computedWidth = window.getComputedStyle(energyFill).width;
+                    if (computedWidth !== '0px') {
+                        console.log(`⚠️ Barra do Jogador ${i} não está em 0%: ${computedWidth}`);
+                        allReset = false;
+                    }
+                }
+            }
+        }
+        
+        if (allReset) {
+            console.log('✅ VERIFICAÇÃO FINAL: TUDO FOI RESETADO COM SUCESSO!');
+        } else {
+            console.log('❌ VERIFICAÇÃO FINAL: ALGUNS ELEMENTOS NÃO FORAM RESETADOS!');
+            // Forçar reset novamente
+            setTimeout(() => {
+                this.forceFinalReset();
+            }, 500);
+        }
+    }
+    
+    // 🚀 RESET COMPLETO - VOLTAR AO ESTADO INICIAL EXATO
+    completeReset() {
+        console.log('🚀 EXECUTANDO RESET COMPLETO - VOLTANDO AO ESTADO INICIAL...');
+        
+        // 1. PARAR TODOS OS TIMERS E PROCESSOS
+        this.stopAllTimers();
+        
+        // 2. RESETAR ESTADO INTERNO COMPLETAMENTE
+        this.gameState = 'waiting';
+        this.gameTime = 0;
+        this.esp32Connected = false;
+        this.lastPedalCount = 0;
+        this.lastPedalTime = 0;
+        this.debugCounter = 0;
+        
+        // 3. RESETAR TODOS OS JOGADORES PARA VALORES INICIAIS
+        this.players = [
+            { id: 1, key: 'KeyQ', energy: 0, score: 0, isPedaling: false, lastPedalTime: 0 },
+            { id: 2, key: 'KeyW', energy: 0, score: 0, isPedaling: false, lastPedalTime: 0 },
+            { id: 3, key: 'KeyE', energy: 0, score: 0, isPedaling: false, lastPedalTime: 0 },
+            { id: 4, key: 'KeyR', energy: 0, score: 0, isPedaling: false, lastPedalTime: 0 }
+        ];
+        
+        // 4. RESETAR LEDS VIRTUAIS
+        this.resetAllLeds();
+        
+        // 5. RESETAR CONFIGURAÇÕES PARA PADRÃO
+        this.useDefaultConfig();
+        
+        // 6. RESETAR RELATÓRIOS
+        this.currentGameReport = null;
+        
+        // 7. RESETAR DOM COMPLETAMENTE
+        this.resetDOMCompletely();
+        
+        // 8. RESETAR SERVIDOR
+        this.resetServerCompletely();
+        
+        // 9. RESTAURAR CONTROLES
+        this.restoreControls();
+        
+        // 10. VERIFICAÇÃO FINAL
+        setTimeout(() => {
+            this.verifyCompleteReset();
+        }, 100);
+        
+        console.log('🚀 RESET COMPLETO EXECUTADO!');
+    }
+    
+    // 🛑 PARAR TODOS OS TIMERS
+    stopAllTimers() {
+        console.log('🛑 Parando todos os timers...');
+        
+        if (this.gameTimer) {
+            clearInterval(this.gameTimer);
+            this.gameTimer = null;
+        }
+        
+        if (this.decayTimer) {
+            clearInterval(this.decayTimer);
+            this.decayTimer = null;
+        }
+        
+        if (this.autoRestartTimer) {
+            clearInterval(this.autoRestartTimer);
+            this.autoRestartTimer = null;
+        }
+        
+        // Parar todos os timers de LED
+        Object.values(this.virtualLeds.strobeTimers).forEach(timer => {
+            if (timer) clearInterval(timer);
+        });
+        this.virtualLeds.strobeTimers = {};
+        
+        console.log('🛑 Todos os timers parados!');
+    }
+    
+    // 🎨 RESETAR DOM COMPLETAMENTE
+    resetDOMCompletely() {
+        console.log('🎨 Resetando DOM completamente...');
+        
+        // Resetar todas as barras de energia
+        for (let i = 1; i <= 4; i++) {
+            const playerBar = document.getElementById(`player${i}`);
+            if (playerBar) {
+                // Resetar barra de energia
+                const energyFill = playerBar.querySelector('.energy-fill');
+                if (energyFill) {
+                    // FORÇAR RESET COM ATRIBUTOS
+                    energyFill.removeAttribute('style');
+                    energyFill.style.cssText = `
+                        width: 0% !important;
+                        transition: none !important;
+                        opacity: 1 !important;
+                        background: linear-gradient(90deg, #ff6b6b 0%, #4ecdc4 100%) !important;
+                    `;
+                }
+                
+                // Resetar status
+                const playerStatus = playerBar.querySelector('.player-status');
+                if (playerStatus) {
+                    playerStatus.textContent = 'Aguardando...';
+                    playerStatus.style.color = '#cccccc';
+                    playerStatus.style.fontWeight = 'normal';
+                }
+                
+                // Resetar pontuação
+                const playerScore = playerBar.querySelector('.player-score');
+                if (playerScore) {
+                    playerScore.textContent = '0';
+                    playerScore.style.animation = '';
+                    playerScore.style.transform = '';
+                }
+                
+                // Resetar nome
+                const playerName = playerBar.querySelector('.player-name');
+                if (playerName) {
+                    playerName.innerHTML = `Jogador ${i}`;
+                    playerName.style.color = '';
+                    playerName.style.fontWeight = '';
+                }
+                
+                // REMOVER TODAS AS CLASSES ESPECIAIS
+                playerBar.className = 'player-bar';
+                if (energyFill) {
+                    energyFill.className = 'energy-fill';
+                }
+                
+                // Forçar reflow
+                playerBar.offsetHeight;
+            }
+        }
+        
+        // Resetar botões
+        const startBtn = document.getElementById('startBtn');
+        if (startBtn) {
+            startBtn.disabled = false;
+            startBtn.textContent = 'Iniciar Jogo';
+        }
+        
+        // Remover mensagens de vencedor
+        this.removeWinnerEffects();
+        
+        console.log('🎨 DOM resetado completamente!');
+    }
+    
+    // 🌐 RESETAR SERVIDOR COMPLETAMENTE
+    resetServerCompletely() {
+        console.log('🌐 Resetando servidor completamente...');
+        
+        // Resetar jogo no servidor
+        fetch('/api/reset-game')
+            .then(response => response.text())
+            .then(data => {
+                console.log('🌐 Servidor resetado!');
+                
+                // Verificar se foi resetado
+                setTimeout(() => {
+                    this.verifyServerReset();
+                }, 200);
+            })
+            .catch(error => {
+                console.log('❌ Erro ao resetar servidor: ' + error);
+            });
+    }
+    
+    // 🎮 RESTAURAR CONTROLES
+    restoreControls() {
+        console.log('🎮 Restaurando controles...');
+        
+        // Habilitar botão de início
+        const startBtn = document.getElementById('startBtn');
+        if (startBtn) {
+            startBtn.disabled = false;
+            startBtn.textContent = 'Iniciar Jogo';
+        }
+        
+        // Restaurar configurações visuais
+        this.updateConfigDisplay();
+        
+        console.log('🎮 Controles restaurados!');
+    }
+    
+    // 🔍 VERIFICAÇÃO COMPLETA DO RESET
+    verifyCompleteReset() {
+        console.log('🔍 VERIFICAÇÃO COMPLETA DO RESET...');
+        
+        let allGood = true;
+        
+        // Verificar estado interno
+        if (this.gameState !== 'waiting') {
+            console.log('⚠️ Estado do jogo não é "waiting"');
+            allGood = false;
+        }
+        
+        // Verificar jogadores
+        this.players.forEach(player => {
+            if (player.energy !== 0 || player.score !== 0 || player.isPedaling !== false) {
+                console.log(`⚠️ Jogador ${player.id} não foi resetado: energy=${player.energy}, score=${player.score}, isPedaling=${player.isPedaling}`);
+                allGood = false;
+            }
+        });
+        
+        // Verificar barras visuais
+        for (let i = 1; i <= 4; i++) {
+            const playerBar = document.getElementById(`player${i}`);
+            if (playerBar) {
+                const energyFill = playerBar.querySelector('.energy-fill');
+                if (energyFill) {
+                    const computedWidth = window.getComputedStyle(energyFill).width;
+                    if (computedWidth !== '0px') {
+                        console.log(`⚠️ Barra do Jogador ${i} não está em 0%: ${computedWidth}`);
+                        allGood = false;
+                    }
+                }
+                
+                const playerStatus = playerBar.querySelector('.player-status');
+                if (playerStatus && playerStatus.textContent !== 'Aguardando...') {
+                    console.log(`⚠️ Status do Jogador ${i} não é "Aguardando...": ${playerStatus.textContent}`);
+                    allGood = false;
+                }
+            }
+        }
+        
+        if (allGood) {
+            console.log('✅ VERIFICAÇÃO COMPLETA: JOGO VOLTOU AO ESTADO INICIAL PERFEITAMENTE!');
+            this.showMessage('Jogo resetado completamente!');
+        } else {
+            console.log('❌ VERIFICAÇÃO COMPLETA: ALGUNS ELEMENTOS NÃO FORAM RESETADOS!');
+            // Tentar reset novamente
+            setTimeout(() => {
+                this.completeReset();
+            }, 500);
+        }
+    }
+    
+    // ⏰ PARAR DECAIMENTO DE ENERGIA
+    stopEnergyDecay() {
+        console.log('⏰ Parando decaimento de energia...');
+        
+        if (this.decayTimer) {
+            clearInterval(this.decayTimer);
+            this.decayTimer = null;
+            console.log('⏰ Timer de decaimento parado!');
+        }
+    }
+    
+
 }
 
 // Inicializar o jogo quando a página carregar

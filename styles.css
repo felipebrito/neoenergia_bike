@@ -220,6 +220,8 @@ header p {
     font-size: 1rem;
 }
 
+
+
 .game-controls {
     text-align: center;
     margin-bottom: 20px;
@@ -848,6 +850,25 @@ header p {
         width: 40px;
         height: 40px;
     }
-    
+}
 
+/* ❄️ EFEITO DE CONGELAMENTO */
+.player-bar.frozen {
+    opacity: 0.6;
+    pointer-events: none;
+    transition: all 0.3s ease;
+}
+
+.energy-fill.frozen {
+    opacity: 0.8;
+    filter: brightness(0.7) saturate(0.5);
+    transition: all 0.3s ease;
+}
+
+.player-bar.frozen .player-name {
+    color: #87CEEB !important;
+}
+
+.player-bar.frozen .player-status {
+    color: #87CEEB !important;
 }
