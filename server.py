@@ -28,19 +28,61 @@ def load_serial_config():
         if os.path.exists(CONFIG_FILE):
             with open(CONFIG_FILE, 'r') as f:
                 config = json.load(f)
-                SERIAL_PORT = config.get('serial_port')
-                print(f"📁 Configuração carregada: {SERIAL_PORT}")
+                loaded_port = config.get('serial_port')
+                # Verificar se a porta carregada é válida
+                if loaded_port and is_valid_serial_port(loaded_port):
+                    SERIAL_PORT = loaded_port
+                    print(f"📁 Configuração carregada: {SERIAL_PORT}")
+                else:
+                    print(f"⚠️ Porta configurada inválida: {loaded_port}")
+                    SERIAL_PORT = None
         else:
-            # Tentar detectar automaticamente
+            # Tentar detectar automaticamente uma porta válida
             ports = list_available_ports()
-            if ports:
-                SERIAL_PORT = ports[0]['port']
+            valid_ports = [p for p in ports if is_valid_serial_port(p['port'])]
+            if valid_ports:
+                SERIAL_PORT = valid_ports[0]['port']
                 save_serial_config(SERIAL_PORT)
-                print(f"🔍 Porta detectada automaticamente: {SERIAL_PORT}")
+                print(f"🔍 Porta válida detectada automaticamente: {SERIAL_PORT}")
             else:
-                print("⚠️ Nenhuma porta serial detectada")
+                print("⚠️ Nenhuma porta serial válida detectada")
+                SERIAL_PORT = None
     except Exception as e:
         print(f"❌ Erro ao carregar configuração: {e}")
+        SERIAL_PORT = None
+
+def is_valid_serial_port(port):
+    """Verificar se uma porta serial é válida para ESP32"""
+    if not port:
+        return False
+    
+    # Portas que não são válidas para ESP32
+    invalid_patterns = [
+        'debug-console',
+        'Bluetooth',
+        'modem',
+        'dialout',
+        'tty.Bluetooth'
+    ]
+    
+    for pattern in invalid_patterns:
+        if pattern.lower() in port.lower():
+            return False
+    
+    # Portas válidas geralmente contêm
+    valid_patterns = [
+        'usbserial',
+        'usbmodem',
+        'ttyUSB',
+        'ttyACM',
+        'COM'
+    ]
+    
+    for pattern in valid_patterns:
+        if pattern.lower() in port.lower():
+            return True
+    
+    return False
 
 def save_serial_config(port):
     """Salvar configuração da porta serial no arquivo"""
