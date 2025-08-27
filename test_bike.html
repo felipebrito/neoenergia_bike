@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🚴 Teste Bike - Detecção de Pedaladas</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+            background: #1a1a1a;
+            color: white;
+            overflow: hidden;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        
+        h1 {
+            text-align: center;
+            color: #4CAF50;
+            margin-bottom: 30px;
+        }
+        
+        .status {
+            background: #333;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        .bike {
+            position: absolute;
+            width: 60px;
+            height: 40px;
+            background: #4CAF50;
+            border-radius: 20px;
+            left: 50px;
+            bottom: 100px;
+            transition: all 0.3s ease;
+            box-shadow: 0 0 20px #4CAF50;
+        }
+        
+        .bike::before {
+            content: "🚴";
+            position: absolute;
+            top: -20px;
+            left: 10px;
+            font-size: 24px;
+        }
+        
+        .road {
+            position: absolute;
+            bottom: 80px;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: #666;
+        }
+        
+        .pedal-count {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: #333;
+            padding: 15px;
+            border-radius: 10px;
+            font-size: 18px;
+            font-weight: bold;
+        }
+        
+        .energy-bar {
+            position: absolute;
+            top: 80px;
+            right: 20px;
+            width: 20px;
+            height: 200px;
+            background: #333;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        
+        .energy-fill {
+            position: absolute;
+            bottom: 0;
+            width: 100%;
+            background: #4CAF50;
+            transition: height 0.3s ease;
+            height: 0%;
+        }
+        
+        .console {
+            background: #000;
+            color: #0f0;
+            padding: 20px;
+            border-radius: 10px;
+            height: 200px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 14px;
+            margin-top: 20px;
+        }
+        
+        .controls {
+            text-align: center;
+            margin: 20px 0;
+        }
+        
+        button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 0 10px;
+            font-size: 16px;
+        }
+        
+        button:hover {
+            background: #45a049;
+        }
+        
+        button:disabled {
+            background: #666;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚴 Teste Bike - Detecção de Pedaladas</h1>
+        
+        <div class="status">
+            <h3>Status: <span id="status">Aguardando...</span></h3>
+            <p>Pedale na bicicleta para ver o objeto se movendo!</p>
+        </div>
+        
+        <div class="controls">
+            <button id="startBtn">🚀 Iniciar Jogo</button>
+            <button id="resetBtn">🔄 Resetar</button>
+        </div>
+        
+        <div class="pedal-count">
+            Pedaladas: <span id="pedalCount">0</span>
+        </div>
+        
+        <div class="energy-bar">
+            <div class="energy-fill" id="energyFill"></div>
+        </div>
+        
+        <div class="bike" id="bike"></div>
+        <div class="road"></div>
+        
+        <div class="console" id="console">
+            <div>🚀 Sistema iniciado...</div>
+            <div>📡 Aguardando pedaladas do ESP32...</div>
+        </div>
+    </div>
+
+    <script>
+        class BikeTest {
+            constructor() {
+                this.gameActive = false;
+                this.pedalCount = 0;
+                this.energy = 0;
+                this.bikePosition = 50;
+                this.maxEnergy = 100;
+                
+                this.bike = document.getElementById('bike');
+                this.console = document.getElementById('console');
+                this.status = document.getElementById('status');
+                this.pedalCountDisplay = document.getElementById('pedalCount');
+                this.energyFill = document.getElementById('energyFill');
+                
+                this.setupEventListeners();
+                this.setupWebSocket();
+            }
+            
+            setupEventListeners() {
+                document.getElementById('startBtn').addEventListener('click', () => this.startGame());
+                document.getElementById('resetBtn').addEventListener('click', () => this.resetGame());
+            }
+            
+            startGame() {
+                this.gameActive = true;
+                this.status.textContent = '🎮 Jogo Ativo - Pedale!';
+                document.getElementById('startBtn').disabled = true;
+                this.log('🎮 Jogo iniciado! Pedale na bicicleta...');
+            }
+            
+            resetGame() {
+                this.gameActive = false;
+                this.pedalCount = 0;
+                this.energy = 0;
+                this.bikePosition = 50;
+                
+                this.status.textContent = 'Aguardando...';
+                document.getElementById('startBtn').disabled = false;
+                this.updateDisplay();
+                this.log('🔄 Jogo resetado!');
+            }
+            
+            startPolling() {
+                // Polling a cada 100ms para verificar estado do jogo
+                setInterval(() => {
+                    this.checkGameState();
+                }, 100);
+            }
+            
+            async checkGameState() {
+                try {
+                    const response = await fetch('/api/state');
+                    const gameState = await response.json();
+                    
+                    // Atualizar energia do jogador 1
+                    if (gameState.player1_energy !== this.energy) {
+                        const oldEnergy = this.energy;
+                        this.energy = gameState.player1_energy;
+                        
+                        // Log da mudança de energia
+                        if (this.energy > oldEnergy) {
+                            this.log(`🚴 PEDALADA #${gameState.pedal_count} - Energia: ${this.energy}%`);
+                            this.pedalCount++;
+                            this.moveBike();
+                        }
+                        
+                        this.updateDisplay();
+                    }
+                } catch (error) {
+                    // Silenciar erros de polling
+                }
+            }
+            
+            moveBike() {
+                // Mover bicicleta para direita
+                this.bikePosition += 20;
+                if (this.bikePosition > window.innerWidth - 100) {
+                    this.bikePosition = 50; // Voltar ao início
+                }
+                
+                this.bike.style.left = this.bikePosition + 'px';
+                
+                // Efeito visual
+                this.bike.style.transform = 'scale(1.2)';
+                setTimeout(() => {
+                    this.bike.style.transform = 'scale(1)';
+                }, 200);
+            }
+            
+            updateDisplay() {
+                this.pedalCountDisplay.textContent = this.pedalCount;
+                
+                // Atualizar barra de energia
+                const energyPercentage = (this.energy / this.maxEnergy) * 100;
+                this.energyFill.style.height = energyPercentage + '%';
+                
+                // Mudar cor da energia
+                if (energyPercentage > 80) {
+                    this.energyFill.style.background = '#ff4444'; // Vermelho
+                } else if (energyPercentage > 50) {
+                    this.energyFill.style.background = '#ffaa00'; // Laranja
+                } else {
+                    this.energyFill.style.background = '#4CAF50'; // Verde
+                }
+            }
+            
+            log(message) {
+                const timestamp = new Date().toLocaleTimeString();
+                const logEntry = document.createElement('div');
+                logEntry.textContent = `[${timestamp}] ${message}`;
+                this.console.appendChild(logEntry);
+                this.console.scrollTop = this.console.scrollHeight;
+                
+                // Limitar logs para não sobrecarregar
+                if (this.console.children.length > 50) {
+                    this.console.removeChild(this.console.firstChild);
+                }
+            }
+        }
+        
+        // Inicializar quando a página carregar
+        document.addEventListener('DOMContentLoaded', () => {
+            new BikeTest();
+        });
+    </script>
+</body>
+</html>
