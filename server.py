@@ -5,16 +5,106 @@ Lê ESP32 e serve HTML com atualizações em tempo real
 """
 
 import serial
+import serial.tools.list_ports
 import threading
 import time
 import http.server
 import socketserver
 import json
+import os
 
 # Configurações
 HTTP_PORT = 9003
-SERIAL_PORT = '/dev/cu.usbserial-2130'
 SERIAL_BAUDRATE = 115200
+
+# Configuração da porta serial (será carregada de arquivo ou definida via interface)
+SERIAL_PORT = None
+CONFIG_FILE = 'serial_config.json'
+
+def load_serial_config():
+    """Carregar configuração da porta serial do arquivo"""
+    global SERIAL_PORT
+    try:
+        if os.path.exists(CONFIG_FILE):
+            with open(CONFIG_FILE, 'r') as f:
+                config = json.load(f)
+                SERIAL_PORT = config.get('serial_port')
+                print(f"📁 Configuração carregada: {SERIAL_PORT}")
+        else:
+            # Tentar detectar automaticamente
+            ports = list_available_ports()
+            if ports:
+                SERIAL_PORT = ports[0]['port']
+                save_serial_config(SERIAL_PORT)
+                print(f"🔍 Porta detectada automaticamente: {SERIAL_PORT}")
+            else:
+                print("⚠️ Nenhuma porta serial detectada")
+    except Exception as e:
+        print(f"❌ Erro ao carregar configuração: {e}")
+
+def save_serial_config(port):
+    """Salvar configuração da porta serial no arquivo"""
+    try:
+        config = {'serial_port': port}
+        with open(CONFIG_FILE, 'w') as f:
+            json.dump(config, f)
+        print(f"💾 Configuração salva: {port}")
+    except Exception as e:
+        print(f"❌ Erro ao salvar configuração: {e}")
+
+def list_available_ports():
+    """Listar todas as portas seriais disponíveis"""
+    ports = []
+    try:
+        available_ports = serial.tools.list_ports.comports()
+        for port in available_ports:
+            port_info = {
+                'port': port.device,
+                'description': port.description,
+                'manufacturer': port.manufacturer if port.manufacturer else 'N/A',
+                'hwid': port.hwid,
+                'vid': port.vid,
+                'pid': port.pid
+            }
+            ports.append(port_info)
+        
+        print(f"🔍 {len(ports)} portas seriais detectadas:")
+        for port in ports:
+            print(f"   📡 {port['port']} - {port['description']} ({port['manufacturer']})")
+        
+        return ports
+    except Exception as e:
+        print(f"❌ Erro ao listar portas: {e}")
+        return []
+
+def change_serial_port(new_port):
+    """Alterar porta serial e reconectar"""
+    global SERIAL_PORT
+    try:
+        # Parar conexão atual
+        if esp32_reader:
+            esp32_reader.stop()
+        
+        # Atualizar porta
+        SERIAL_PORT = new_port
+        save_serial_config(new_port)
+        
+        # Reconectar se uma nova porta foi especificada
+        if new_port and esp32_reader:
+            success = esp32_reader.start()
+            if success:
+                print(f"✅ Porta serial alterada para: {new_port}")
+                return True
+            else:
+                print(f"❌ Falha ao conectar na porta: {new_port}")
+                return False
+        else:
+            print(f"✅ Desconectado da porta serial")
+            return True
+            
+    except Exception as e:
+        print(f"❌ Erro ao alterar porta: {e}")
+        return False
 
 # Estado do jogo
 game_state = {
@@ -33,6 +123,10 @@ class ESP32Reader:
         self.running = False
 
     def start(self):
+        if not SERIAL_PORT:
+            print("⚠️ Nenhuma porta serial configurada")
+            return False
+            
         try:
             self.serial_conn = serial.Serial(SERIAL_PORT, SERIAL_BAUDRATE, timeout=1)
             self.running = True
@@ -41,9 +135,11 @@ class ESP32Reader:
             # Thread de leitura serial
             self.read_thread = threading.Thread(target=self._read_serial, daemon=True)
             self.read_thread.start()
+            return True
 
         except Exception as e:
             print(f"❌ Erro ao conectar com ESP32: {e}")
+            return False
 
     def stop(self):
         self.running = False
@@ -166,20 +262,72 @@ class BikeJJHTTPHandler(http.server.SimpleHTTPRequestHandler):
             self.send_response(200)
             self.end_headers()
             self.wfile.write(b"OK")
+        elif self.path == '/api/serial/ports':
+            # Listar portas seriais disponíveis
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.end_headers()
+            ports = list_available_ports()
+            response = {
+                'ports': ports,
+                'current_port': SERIAL_PORT,
+                'connected': esp32_reader.running if esp32_reader else False
+            }
+            self.wfile.write(json.dumps(response).encode())
+        elif self.path == '/api/serial/status':
+            # Status da conexão serial
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.end_headers()
+            status = {
+                'current_port': SERIAL_PORT,
+                'connected': esp32_reader.running if esp32_reader else False,
+                'baudrate': SERIAL_BAUDRATE
+            }
+            self.wfile.write(json.dumps(status).encode())
         else:
             # Servir arquivos estáticos
             super().do_GET()
+    
+    def do_POST(self):
+        if self.path == '/api/serial/change-port':
+            # Alterar porta serial
+            content_length = int(self.headers['Content-Length'])
+            post_data = self.rfile.read(content_length)
+            data = json.loads(post_data.decode('utf-8'))
+            
+            new_port = data.get('port')
+            if new_port:
+                success = change_serial_port(new_port)
+                response = {'success': success, 'port': new_port}
+            else:
+                response = {'success': False, 'error': 'Porta não especificada'}
+            
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.end_headers()
+            self.wfile.write(json.dumps(response).encode())
+        else:
+            self.send_response(404)
+            self.end_headers()
 
 def main():
     print("🚀 Iniciando servidor BikeJJ...")
     
+    # Carregar configuração da porta serial
+    load_serial_config()
+    
     # Iniciar leitor ESP32
-    esp32_reader.start()
+    if SERIAL_PORT:
+        esp32_reader.start()
+    else:
+        print("⚠️ ESP32 não conectado - apenas controles de teclado disponíveis")
     
     # Iniciar servidor HTTP
     with socketserver.TCPServer(("", HTTP_PORT), BikeJJHTTPHandler) as httpd:
         print(f"✅ Servidor HTTP rodando em http://localhost:{HTTP_PORT}")
         print(f"🎮 Acesse o jogo em: http://localhost:{HTTP_PORT}")
+        print(f"🔧 Configurador serial em: http://localhost:{HTTP_PORT}/serial_config.html")
         print("🛑 Pressione Ctrl+C para parar")
         
         try:

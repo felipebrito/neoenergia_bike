@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔧 Configurador Serial - BikeJJ</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: white;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: rgba(0, 0, 0, 0.8);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            background: linear-gradient(45deg, #ff6b6b, #4ecdc4);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .header p {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+
+        .status-card {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 30px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 10px;
+        }
+
+        .status-connected {
+            background: #4CAF50;
+            box-shadow: 0 0 10px #4CAF50;
+        }
+
+        .status-disconnected {
+            background: #f44336;
+            box-shadow: 0 0 10px #f44336;
+        }
+
+        .ports-section {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 30px;
+        }
+
+        .ports-section h3 {
+            margin-bottom: 20px;
+            color: #4ecdc4;
+        }
+
+        .port-list {
+            display: grid;
+            gap: 15px;
+        }
+
+        .port-item {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 15px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .port-item:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: #4ecdc4;
+            transform: translateY(-2px);
+        }
+
+        .port-item.selected {
+            background: rgba(78, 205, 196, 0.2);
+            border-color: #4ecdc4;
+            box-shadow: 0 0 20px rgba(78, 205, 196, 0.3);
+        }
+
+        .port-name {
+            font-size: 1.2em;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .port-description {
+            font-size: 0.9em;
+            opacity: 0.8;
+            margin-bottom: 5px;
+        }
+
+        .port-manufacturer {
+            font-size: 0.8em;
+            opacity: 0.6;
+        }
+
+        .actions {
+            text-align: center;
+        }
+
+        .btn {
+            background: linear-gradient(45deg, #ff6b6b, #4ecdc4);
+            border: none;
+            color: white;
+            padding: 15px 30px;
+            font-size: 1.1em;
+            border-radius: 25px;
+            cursor: pointer;
+            margin: 10px;
+            transition: all 0.3s ease;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.4);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-refresh {
+            background: linear-gradient(45deg, #2196F3, #21CBF3);
+        }
+
+        .btn-connect {
+            background: linear-gradient(45deg, #4CAF50, #45a049);
+        }
+
+        .btn-disconnect {
+            background: linear-gradient(45deg, #f44336, #d32f2f);
+        }
+
+        .message {
+            padding: 15px;
+            border-radius: 10px;
+            margin: 20px 0;
+            text-align: center;
+            font-weight: bold;
+        }
+
+        .message.success {
+            background: rgba(76, 175, 80, 0.2);
+            border: 1px solid #4CAF50;
+            color: #4CAF50;
+        }
+
+        .message.error {
+            background: rgba(244, 67, 54, 0.2);
+            border: 1px solid #f44336;
+            color: #f44336;
+        }
+
+        .message.info {
+            background: rgba(33, 150, 243, 0.2);
+            border: 1px solid #2196F3;
+            color: #2196F3;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 1s ease-in-out infinite;
+            margin-right: 10px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .footer {
+            text-align: center;
+            margin-top: 30px;
+            opacity: 0.7;
+        }
+
+        .footer a {
+            color: #4ecdc4;
+            text-decoration: none;
+        }
+
+        .footer a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔧 Configurador Serial</h1>
+            <p>Configure a porta serial para conectar com o ESP32</p>
+        </div>
+
+        <div class="status-card">
+            <h3>📡 Status da Conexão</h3>
+            <div id="connectionStatus">
+                <span class="status-indicator status-disconnected"></span>
+                <span id="statusText">Desconectado</span>
+            </div>
+            <div id="statusDetails" style="margin-top: 10px; opacity: 0.8;">
+                Porta: <span id="currentPort">Nenhuma</span> | 
+                Baudrate: <span id="currentBaudrate">115200</span>
+            </div>
+        </div>
+
+        <div class="ports-section">
+            <h3>🔌 Portas Disponíveis</h3>
+            <div id="portsList" class="port-list">
+                <div style="text-align: center; padding: 20px; opacity: 0.7;">
+                    Carregando portas...
+                </div>
+            </div>
+        </div>
+
+        <div class="actions">
+            <button class="btn btn-refresh" onclick="refreshPorts()">
+                🔄 Atualizar Portas
+            </button>
+            <button class="btn btn-connect" id="connectBtn" onclick="connectToPort()" disabled>
+                🔌 Conectar
+            </button>
+            <button class="btn btn-disconnect" id="disconnectBtn" onclick="disconnectPort()" disabled>
+                ❌ Desconectar
+            </button>
+        </div>
+
+        <div id="messageContainer"></div>
+
+        <div class="footer">
+            <p>
+                <a href="/">← Voltar ao Jogo</a> | 
+                <a href="#" onclick="refreshStatus()">🔄 Atualizar Status</a>
+            </p>
+        </div>
+    </div>
+
+    <script>
+        let selectedPort = null;
+        let currentStatus = null;
+
+        // Carregar status inicial
+        document.addEventListener('DOMContentLoaded', function() {
+            refreshStatus();
+            refreshPorts();
+        });
+
+        // Atualizar status da conexão
+        async function refreshStatus() {
+            try {
+                const response = await fetch('/api/serial/status');
+                const status = await response.json();
+                currentStatus = status;
+                updateStatusDisplay(status);
+            } catch (error) {
+                console.error('Erro ao carregar status:', error);
+                showMessage('❌ Erro ao carregar status da conexão', 'error');
+            }
+        }
+
+        // Atualizar display do status
+        function updateStatusDisplay(status) {
+            const statusIndicator = document.querySelector('.status-indicator');
+            const statusText = document.getElementById('statusText');
+            const currentPortSpan = document.getElementById('currentPort');
+            const currentBaudrateSpan = document.getElementById('currentBaudrate');
+
+            if (status.connected) {
+                statusIndicator.className = 'status-indicator status-connected';
+                statusText.textContent = 'Conectado';
+                document.getElementById('connectBtn').disabled = true;
+                document.getElementById('disconnectBtn').disabled = false;
+            } else {
+                statusIndicator.className = 'status-indicator status-disconnected';
+                statusText.textContent = 'Desconectado';
+                document.getElementById('connectBtn').disabled = false;
+                document.getElementById('disconnectBtn').disabled = true;
+            }
+
+            currentPortSpan.textContent = status.current_port || 'Nenhuma';
+            currentBaudrateSpan.textContent = status.baudrate;
+        }
+
+        // Atualizar lista de portas
+        async function refreshPorts() {
+            try {
+                const response = await fetch('/api/serial/ports');
+                const data = await response.json();
+                updatePortsList(data.ports, data.current_port);
+            } catch (error) {
+                console.error('Erro ao carregar portas:', error);
+                showMessage('❌ Erro ao carregar lista de portas', 'error');
+            }
+        }
+
+        // Atualizar lista de portas na interface
+        function updatePortsList(ports, currentPort) {
+            const portsList = document.getElementById('portsList');
+            
+            if (ports.length === 0) {
+                portsList.innerHTML = `
+                    <div style="text-align: center; padding: 20px; opacity: 0.7;">
+                        Nenhuma porta serial detectada
+                    </div>
+                `;
+                return;
+            }
+
+            portsList.innerHTML = ports.map(port => `
+                <div class="port-item ${port.port === currentPort ? 'selected' : ''}" 
+                     onclick="selectPort('${port.port}')">
+                    <div class="port-name">${port.port}</div>
+                    <div class="port-description">${port.description}</div>
+                    <div class="port-manufacturer">${port.manufacturer}</div>
+                </div>
+            `).join('');
+
+            // Selecionar porta atual se existir
+            if (currentPort) {
+                selectedPort = currentPort;
+            }
+        }
+
+        // Selecionar uma porta
+        function selectPort(port) {
+            selectedPort = port;
+            
+            // Atualizar seleção visual
+            document.querySelectorAll('.port-item').forEach(item => {
+                item.classList.remove('selected');
+            });
+            
+            const selectedItem = Array.from(document.querySelectorAll('.port-item'))
+                .find(item => item.querySelector('.port-name').textContent === port);
+            
+            if (selectedItem) {
+                selectedItem.classList.add('selected');
+            }
+
+            // Habilitar botão de conexão
+            document.getElementById('connectBtn').disabled = false;
+        }
+
+        // Conectar à porta selecionada
+        async function connectToPort() {
+            if (!selectedPort) {
+                showMessage('⚠️ Selecione uma porta primeiro', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/serial/change-port', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ port: selectedPort })
+                });
+
+                const result = await response.json();
+                
+                if (result.success) {
+                    showMessage(`✅ Conectado à porta ${selectedPort}`, 'success');
+                    refreshStatus();
+                    refreshPorts();
+                } else {
+                    showMessage(`❌ Erro ao conectar: ${result.error || 'Erro desconhecido'}`, 'error');
+                }
+            } catch (error) {
+                console.error('Erro ao conectar:', error);
+                showMessage('❌ Erro ao conectar à porta', 'error');
+            }
+        }
+
+        // Desconectar da porta atual
+        async function disconnectPort() {
+            try {
+                const response = await fetch('/api/serial/change-port', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ port: null })
+                });
+
+                const result = await response.json();
+                
+                if (result.success) {
+                    showMessage('✅ Desconectado com sucesso', 'success');
+                    refreshStatus();
+                    refreshPorts();
+                } else {
+                    showMessage(`❌ Erro ao desconectar: ${result.error || 'Erro desconhecido'}`, 'error');
+                }
+            } catch (error) {
+                console.error('Erro ao desconectar:', error);
+                showMessage('❌ Erro ao desconectar da porta', 'error');
+            }
+        }
+
+        // Mostrar mensagem
+        function showMessage(text, type = 'info') {
+            const messageContainer = document.getElementById('messageContainer');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${type}`;
+            messageDiv.textContent = text;
+            
+            messageContainer.innerHTML = '';
+            messageContainer.appendChild(messageDiv);
+
+            // Remover mensagem após 5 segundos
+            setTimeout(() => {
+                if (messageDiv.parentNode) {
+                    messageDiv.remove();
+                }
+            }, 5000);
+        }
+
+        // Atualizar automaticamente a cada 10 segundos
+        setInterval(() => {
+            refreshStatus();
+        }, 10000);
+    </script>
+</body>
+</html>

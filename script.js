@@ -68,6 +68,9 @@ class BikeJJGame {
         document.getElementById('applyConfig').addEventListener('click', () => this.applyConfig());
         document.getElementById('resetConfig').addEventListener('click', () => this.resetConfig());
         
+        // Configurador serial
+        document.getElementById('serialConfigBtn').addEventListener('click', () => this.openSerialConfig());
+        
         // Eventos dos sliders de configuração
         this.setupConfigSliders();
         
@@ -1303,6 +1306,11 @@ class BikeJJGame {
     
     hideConfigMenu() {
         document.getElementById('configMenu').classList.remove('show');
+    }
+    
+    // 🔧 Abrir configurador serial
+    openSerialConfig() {
+        window.open('/serial_config.html', '_blank', 'width=900,height=700');
     }
     
     setupConfigSliders() {

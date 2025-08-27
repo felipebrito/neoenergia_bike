@@ -280,6 +280,18 @@ header p {
     box-shadow: 0 8px 25px rgba(156, 39, 176, 0.6);
 }
 
+.btn-serial {
+    background: linear-gradient(45deg, #2196F3, #21CBF3);
+    color: white;
+    box-shadow: 0 5px 15px rgba(33, 150, 243, 0.4);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.btn-serial:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(33, 150, 243, 0.6);
+}
+
 .btn-reset {
     background: linear-gradient(45deg, #FF9800, #F57C00);
     color: white;
