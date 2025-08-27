@@ -14,7 +14,7 @@ import json
 import os
 
 # Configurações
-HTTP_PORT = 9003
+HTTP_PORT = 9004
 SERIAL_BAUDRATE = 115200
 
 # Configuração da porta serial (será carregada de arquivo ou definida via interface)
