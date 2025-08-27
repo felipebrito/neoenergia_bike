@@ -69,7 +69,16 @@ class BikeJJGame {
         document.getElementById('resetConfig').addEventListener('click', () => this.resetConfig());
         
         // Configurador serial
-        document.getElementById('serialConfigBtn').addEventListener('click', () => this.openSerialConfig());
+        const serialConfigBtn = document.getElementById('serialConfigBtn');
+        if (serialConfigBtn) {
+            serialConfigBtn.addEventListener('click', () => {
+                console.log('🔧 Clique no botão Serial detectado!');
+                this.openSerialConfig();
+            });
+            console.log('🔧 Botão Serial configurado com sucesso');
+        } else {
+            console.error('❌ Botão Serial não encontrado!');
+        }
         
         // Eventos dos sliders de configuração
         this.setupConfigSliders();
@@ -1310,7 +1319,18 @@ class BikeJJGame {
     
     // 🔧 Abrir configurador serial
     openSerialConfig() {
-        window.open('/serial_config.html', '_blank', 'width=900,height=700');
+        console.log('🔧 Abrindo configurador serial...');
+        const url = '/serial_config.html';
+        console.log(`🔧 URL: ${url}`);
+        
+        // Tentar abrir em nova janela
+        const newWindow = window.open(url, '_blank');
+        
+        // Se falhar, abrir na mesma aba
+        if (!newWindow) {
+            console.log('🔧 Abrindo na mesma aba...');
+            window.location.href = url;
+        }
     }
     
     setupConfigSliders() {
