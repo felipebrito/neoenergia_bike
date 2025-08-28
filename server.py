@@ -179,6 +179,35 @@ game_state = {
     'inactivity_timer': [0, 0, 0, 0]  # Timer de inatividade para cada jogador
 }
 
+# Timer para decaimento de energia (funciona independentemente do jogo)
+last_decay_time = time.time()
+DECAY_INTERVAL = 0.5  # Verificar decaimento a cada 0.5 segundos
+DECAY_RATE = 2.5      # Taxa de decaimento por segundo
+
+def apply_energy_decay():
+    """Aplicar decaimento de energia para todos os jogadores"""
+    global last_decay_time
+    current_time = time.time()
+    
+    # Verificar se é hora de aplicar decaimento
+    if current_time - last_decay_time >= DECAY_INTERVAL:
+        last_decay_time = current_time
+        
+        for player_idx in range(4):
+            # Aplicar decaimento apenas se o jogador não estiver pedalando
+            if not game_state['is_pedaling'][player_idx]:
+                energy_key = f'player{player_idx + 1}_energy'
+                if game_state[energy_key] > 0:
+                    # Calcular decaimento para o intervalo
+                    decay_amount = DECAY_RATE * DECAY_INTERVAL
+                    game_state[energy_key] = max(0, game_state[energy_key] - decay_amount)
+                    
+                    # Log apenas se a energia mudou significativamente
+                    if game_state[energy_key] > 0:
+                        print(f"🛑 Jogador {player_idx + 1}: Decaimento aplicado - Energia: {game_state[energy_key]:.1f}%")
+                    else:
+                        print(f"🛑 Jogador {player_idx + 1}: Energia chegou a 0%")
+
 class ArduinoMegaReader:
     def __init__(self):
         self.serial_conn = None
@@ -211,6 +240,9 @@ class ArduinoMegaReader:
     def _read_serial(self):
         while self.running:
             try:
+                # Aplicar decaimento de energia continuamente
+                apply_energy_decay()
+                
                 if self.serial_conn and self.serial_conn.in_waiting:
                     line = self.serial_conn.readline().decode('utf-8', errors='ignore').strip()
                     if line:
@@ -224,7 +256,9 @@ class ArduinoMegaReader:
         # Processar mensagens do Arduino Mega com 4 jogadores
         current_time = time.time()
         
-        # CAPTURAR PEDALADAS POR JOGADOR
+        print(f"📨 Arduino: {line}")  # Debug: mostrar todas as mensagens
+        
+        # CAPTURAR PEDALADAS POR JOGADOR (Arduino Mega)
         if "Jogador" in line and "Pedalada:" in line:
             try:
                 # Extrair número do jogador (1-4)
@@ -244,37 +278,52 @@ class ArduinoMegaReader:
                     game_state['is_pedaling'][player_idx] = True
                     game_state['inactivity_count'][player_idx] = 0
                     game_state['last_pedal_time'][player_idx] = current_time
-                    
-                    # Incrementar energia do jogador
-                    if game_state['game_active']:
-                        energy_key = f'player{player_idx + 1}_energy'
-                        if game_state[energy_key] < 100:
-                            game_state[energy_key] = min(100, game_state[energy_key] + 5)  # +5% por pedalada
-                            print(f"✅ Jogador {player_idx + 1}: Pedalando - Energia: {game_state[energy_key]:.1f}%")
+                    print(f"✅ ARDUINO MEGA - Jogador {player_idx + 1}: Pedalando")
                     
                 elif "Pedalada: False" in line:
                     game_state['is_pedaling'][player_idx] = False
                     game_state['inactivity_count'][player_idx] += 1
-                    
-                    # Verificar inatividade e aplicar decaimento
-                    if game_state['game_active']:
-                        time_since_last_pedal = current_time - game_state['last_pedal_time'][player_idx]
-                        
-                        if time_since_last_pedal >= 0.5:  # 0.5 segundos de inatividade
-                            energy_key = f'player{player_idx + 1}_energy'
-                            if game_state[energy_key] > 0:
-                                decay_rate = 2.5  # Taxa padrão do menu
-                                energy_to_decay = (decay_rate * 0.5)  # Decaimento para 0.5 segundos
-                                game_state[energy_key] = max(0, game_state[energy_key] - energy_to_decay)
-                                print(f"🛑 Jogador {player_idx + 1}: Inatividade por {time_since_last_pedal:.1f}s - Energia: {game_state[energy_key]:.1f}%")
-                                game_state['last_pedal_time'][player_idx] = current_time
-                            else:
-                                print(f"🛑 Jogador {player_idx + 1}: Inatividade por {time_since_last_pedal:.1f}s - Energia já está em 0%")
-                        else:
-                            print(f"🛑 Jogador {player_idx + 1}: Pedalada: False (Inatividade #{game_state['inactivity_count'][player_idx]})")
+                    print(f"🛑 ARDUINO MEGA - Jogador {player_idx + 1}: Parou de pedalar (Inatividade #{game_state['inactivity_count'][player_idx]})")
             
             except Exception as e:
                 print(f"❌ Erro ao processar mensagem do jogador: {e}")
+        
+        # CAPTURAR INTERRUPÇÕES DE SENSOR (mensagens principais do Arduino Mega)
+        elif "🔍 Jogador" in line and "Pedalada #" in line:
+            try:
+                # Extrair número do jogador e da pedalada
+                if "Jogador 1:" in line:
+                    player_idx = 0
+                elif "Jogador 2:" in line:
+                    player_idx = 1
+                elif "Jogador 3:" in line:
+                    player_idx = 2
+                elif "Jogador 4:" in line:
+                    player_idx = 3
+                else:
+                    return
+                
+                # Extrair número da pedalada
+                if "Pedalada #" in line:
+                    pedal_num = line.split("Pedalada #")[1].split(" ")[0]
+                    print(f"🚴 ARDUINO MEGA - Jogador {player_idx + 1}: Pedalada #{pedal_num}")
+                    
+                    # Incrementar energia imediatamente na interrupção
+                    energy_key = f'player{player_idx + 1}_energy'
+                    if game_state[energy_key] < 100:
+                        game_state[energy_key] = min(100, game_state[energy_key] + 5)
+                        print(f"⚡ Jogador {player_idx + 1}: Energia incrementada para {game_state[energy_key]:.1f}%")
+                    
+                    # Atualizar estado de pedalada
+                    game_state['is_pedaling'][player_idx] = True
+                    game_state['last_pedal_time'][player_idx] = current_time
+                    game_state['inactivity_count'][player_idx] = 0
+                    
+                    # Atualizar contador de pedaladas
+                    game_state['pedal_count'][player_idx] = int(pedal_num)
+            
+            except Exception as e:
+                print(f"❌ Erro ao processar interrupção: {e}")
         
         # CAPTURAR CONTADORES DE PEDALADAS
         elif "Total de pedaladas:" in line:
