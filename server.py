@@ -12,6 +12,7 @@ import http.server
 import socketserver
 import json
 import os
+import platform
 
 # Configurações
 HTTP_PORT = 9000
@@ -364,8 +365,11 @@ class BikeJJHTTPHandler(http.server.SimpleHTTPRequestHandler):
         self.end_headers()
 
     def do_GET(self):
+        print(f"🔍 GET request: {self.path}")
+        
         if self.path == '/api/state':
             # Retornar estado do jogo
+            print(f"📊 Retornando estado do jogo: {game_state}")
             self.send_response(200)
             self.send_header('Content-Type', 'application/json')
             self.end_headers()
