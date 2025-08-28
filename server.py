@@ -193,20 +193,63 @@ def apply_energy_decay():
     if current_time - last_decay_time >= DECAY_INTERVAL:
         last_decay_time = current_time
         
+        print(f"⏰ Aplicando decaimento de energia... (Taxa: {DECAY_RATE}%/s)")
+        
         for player_idx in range(4):
+            energy_key = f'player{player_idx + 1}_energy'
+            is_pedaling = game_state['is_pedaling'][player_idx]
+            current_energy = game_state[energy_key]
+            
+            print(f"🔍 Jogador {player_idx + 1}: Energia={current_energy:.1f}%, Pedalando={is_pedaling}")
+            
             # Aplicar decaimento apenas se o jogador não estiver pedalando
-            if not game_state['is_pedaling'][player_idx]:
-                energy_key = f'player{player_idx + 1}_energy'
-                if game_state[energy_key] > 0:
-                    # Calcular decaimento para o intervalo
-                    decay_amount = DECAY_RATE * DECAY_INTERVAL
-                    game_state[energy_key] = max(0, game_state[energy_key] - decay_amount)
-                    
-                    # Log apenas se a energia mudou significativamente
-                    if game_state[energy_key] > 0:
-                        print(f"🛑 Jogador {player_idx + 1}: Decaimento aplicado - Energia: {game_state[energy_key]:.1f}%")
-                    else:
-                        print(f"🛑 Jogador {player_idx + 1}: Energia chegou a 0%")
+            if not is_pedaling and current_energy > 0:
+                # Calcular decaimento para o intervalo
+                decay_amount = DECAY_RATE * DECAY_INTERVAL
+                new_energy = max(0, current_energy - decay_amount)
+                game_state[energy_key] = new_energy
+                
+                # Log da mudança
+                if new_energy > 0:
+                    print(f"🛑 Jogador {player_idx + 1}: {current_energy:.1f}% → {new_energy:.1f}% (Decaimento: {decay_amount:.1f}%)")
+                else:
+                    print(f"🛑 Jogador {player_idx + 1}: {current_energy:.1f}% → 0% (Energia esgotada)")
+            elif is_pedaling:
+                print(f"✅ Jogador {player_idx + 1}: Pedalando, sem decaimento")
+            else:
+                print(f"⏸️ Jogador {player_idx + 1}: Energia já em 0%")
+        
+        print("=" * 50)
+
+# Thread independente para decaimento de energia
+decay_thread = None
+decay_running = False
+
+def start_decay_thread():
+    """Iniciar thread independente para decaimento de energia"""
+    global decay_thread, decay_running
+    if not decay_running:
+        decay_running = True
+        decay_thread = threading.Thread(target=decay_worker, daemon=True)
+        decay_thread.start()
+        print("⏰ Thread de decaimento iniciada")
+
+def stop_decay_thread():
+    """Parar thread de decaimento"""
+    global decay_running
+    decay_running = False
+    print("⏰ Thread de decaimento parada")
+
+def decay_worker():
+    """Worker thread para aplicar decaimento continuamente"""
+    global last_decay_time
+    while decay_running:
+        try:
+            apply_energy_decay()
+            time.sleep(0.1)  # Verificar a cada 100ms
+        except Exception as e:
+            print(f"❌ Erro na thread de decaimento: {e}")
+            time.sleep(1)
 
 class ArduinoMegaReader:
     def __init__(self):
@@ -240,9 +283,6 @@ class ArduinoMegaReader:
     def _read_serial(self):
         while self.running:
             try:
-                # Aplicar decaimento de energia continuamente
-                apply_energy_decay()
-                
                 if self.serial_conn and self.serial_conn.in_waiting:
                     line = self.serial_conn.readline().decode('utf-8', errors='ignore').strip()
                     if line:
@@ -271,7 +311,10 @@ class ArduinoMegaReader:
                 elif "Jogador 4:" in line:
                     player_idx = 3
                 else:
+                    print(f"⚠️ Jogador não reconhecido na mensagem: {line}")
                     return
+                
+                print(f"🎯 Processando mensagem para Jogador {player_idx + 1}")
                 
                 # Processar estado da pedalada
                 if "Pedalada: True" in line:
@@ -284,9 +327,15 @@ class ArduinoMegaReader:
                     game_state['is_pedaling'][player_idx] = False
                     game_state['inactivity_count'][player_idx] += 1
                     print(f"🛑 ARDUINO MEGA - Jogador {player_idx + 1}: Parou de pedalar (Inatividade #{game_state['inactivity_count'][player_idx]})")
+                
+                # Debug: mostrar estado atual do jogador
+                energy_key = f'player{player_idx + 1}_energy'
+                print(f"📊 Jogador {player_idx + 1}: Energia={game_state[energy_key]:.1f}%, Pedalando={game_state['is_pedaling'][player_idx]}")
             
             except Exception as e:
                 print(f"❌ Erro ao processar mensagem do jogador: {e}")
+                import traceback
+                traceback.print_exc()
         
         # CAPTURAR INTERRUPÇÕES DE SENSOR (mensagens principais do Arduino Mega)
         elif "🔍 Jogador" in line and "Pedalada #" in line:
@@ -565,6 +614,10 @@ def main():
         print("🌐 Abra: http://localhost:9000/serial_config.html")
         print("⚙️ Selecione a porta correta e clique em 'Conectar'")
     
+    # INICIAR THREAD DE DECAIMENTO INDEPENDENTE
+    print("⏰ Iniciando sistema de decaimento de energia...")
+    start_decay_thread()
+    
     # Iniciar servidor HTTP
     with socketserver.TCPServer(("", HTTP_PORT), BikeJJHTTPHandler) as httpd:
         print(f"✅ Servidor HTTP rodando em http://localhost:{HTTP_PORT}")
@@ -576,6 +629,7 @@ def main():
             httpd.serve_forever()
         except KeyboardInterrupt:
             print("\n🛑 Parando servidor...")
+            stop_decay_thread()  # Parar thread de decaimento
             if arduino_reader and arduino_reader.running:
                 arduino_reader.stop()
 
