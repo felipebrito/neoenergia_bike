@@ -14,7 +14,7 @@ import json
 import os
 
 # Configurações
-HTTP_PORT = 9004
+HTTP_PORT = 9000
 SERIAL_BAUDRATE = 115200
 
 # Configuração da porta serial (será carregada de arquivo ou definida via interface)
@@ -41,7 +41,16 @@ def load_serial_config():
             ports = list_available_ports()
             valid_ports = [p for p in ports if is_valid_serial_port(p['port'])]
             if valid_ports:
-                SERIAL_PORT = valid_ports[0]['port']
+                # Priorizar portas COM no Windows
+                if platform.system() == 'Windows':
+                    com_ports = [p for p in valid_ports if p['port'].upper().startswith('COM')]
+                    if com_ports:
+                        SERIAL_PORT = com_ports[0]['port']
+                    else:
+                        SERIAL_PORT = valid_ports[0]['port']
+                else:
+                    SERIAL_PORT = valid_ports[0]['port']
+                
                 save_serial_config(SERIAL_PORT)
                 print(f"🔍 Porta válida detectada automaticamente: {SERIAL_PORT}")
             else:
@@ -52,35 +61,42 @@ def load_serial_config():
         SERIAL_PORT = None
 
 def is_valid_serial_port(port):
-    """Verificar se uma porta serial é válida para ESP32"""
+    """Verificar se uma porta serial é válida para ESP32/Arduino"""
     if not port:
         return False
     
-    # Portas que não são válidas para ESP32
+    # Portas que não são válidas para ESP32/Arduino
     invalid_patterns = [
         'debug-console',
         'Bluetooth',
         'modem',
         'dialout',
-        'tty.Bluetooth'
+        'tty.Bluetooth',
+        'tty.Bluetooth-Incoming-Port'
     ]
     
     for pattern in invalid_patterns:
         if pattern.lower() in port.lower():
             return False
     
-    # Portas válidas geralmente contêm
+    # Portas válidas para ESP32/Arduino
     valid_patterns = [
         'usbserial',
         'usbmodem',
         'ttyUSB',
         'ttyACM',
-        'COM'
+        'COM',
+        'cu.usbserial',
+        'cu.usbmodem'
     ]
     
     for pattern in valid_patterns:
         if pattern.lower() in port.lower():
             return True
+    
+    # No Windows, portas COM são sempre válidas se não contiverem padrões inválidos
+    if platform.system() == 'Windows' and port.upper().startswith('COM'):
+        return True
     
     return False
 
@@ -110,9 +126,22 @@ def list_available_ports():
             }
             ports.append(port_info)
         
+        # Ordenar portas: Windows COM primeiro, depois macOS cu, depois outras
+        def sort_key(port_info):
+            port = port_info['port'].upper()
+            if platform.system() == 'Windows' and port.startswith('COM'):
+                return (0, int(port[3:]) if port[3:].isdigit() else 999)
+            elif port.startswith('/DEV/CU.'):
+                return (1, port)
+            else:
+                return (2, port)
+        
+        ports.sort(key=sort_key)
+        
         print(f"🔍 {len(ports)} portas seriais detectadas:")
         for port in ports:
-            print(f"   📡 {port['port']} - {port['description']} ({port['manufacturer']})")
+            status = "✅ Válida" if is_valid_serial_port(port['port']) else "❌ Inválida"
+            print(f"   📡 {port['port']} - {port['description']} ({port['manufacturer']}) - {status}")
         
         return ports
     except Exception as e:
@@ -124,16 +153,16 @@ def change_serial_port(new_port):
     global SERIAL_PORT
     try:
         # Parar conexão atual
-        if esp32_reader:
-            esp32_reader.stop()
+        if arduino_reader:
+            arduino_reader.stop()
         
         # Atualizar porta
         SERIAL_PORT = new_port
         save_serial_config(new_port)
         
         # Reconectar se uma nova porta foi especificada
-        if new_port and esp32_reader:
-            success = esp32_reader.start()
+        if new_port and arduino_reader:
+            success = arduino_reader.start()
             if success:
                 print(f"✅ Porta serial alterada para: {new_port}")
                 return True
@@ -151,15 +180,18 @@ def change_serial_port(new_port):
 # Estado do jogo
 game_state = {
     'player1_energy': 0,
+    'player2_energy': 0,
+    'player3_energy': 0,
+    'player4_energy': 0,
     'game_active': False,
-    'pedal_count': 0,
-    'is_pedaling': False,
-    'inactivity_count': 0,  # Contador de mensagens de inatividade
-    'last_pedal_time': 0,   # Timestamp da última pedalada real
-    'inactivity_timer': 0   # Timer de inatividade baseado em tempo
+    'pedal_count': [0, 0, 0, 0],  # Contador para cada jogador
+    'is_pedaling': [False, False, False, False],  # Estado de pedalada para cada jogador
+    'inactivity_count': [0, 0, 0, 0],  # Contador de inatividade para cada jogador
+    'last_pedal_time': [0, 0, 0, 0],  # Timestamp da última pedalada para cada jogador
+    'inactivity_timer': [0, 0, 0, 0]  # Timer de inatividade para cada jogador
 }
 
-class ESP32Reader:
+class ArduinoMegaReader:
     def __init__(self):
         self.serial_conn = None
         self.running = False
@@ -172,7 +204,7 @@ class ESP32Reader:
         try:
             self.serial_conn = serial.Serial(SERIAL_PORT, SERIAL_BAUDRATE, timeout=1)
             self.running = True
-            print(f"📡 Conectado ao ESP32 na porta {SERIAL_PORT}")
+            print(f"📡 Conectado ao Arduino Mega na porta {SERIAL_PORT}")
 
             # Thread de leitura serial
             self.read_thread = threading.Thread(target=self._read_serial, daemon=True)
@@ -180,7 +212,7 @@ class ESP32Reader:
             return True
 
         except Exception as e:
-            print(f"❌ Erro ao conectar com ESP32: {e}")
+            print(f"❌ Erro ao conectar com Arduino Mega: {e}")
             return False
 
     def stop(self):
@@ -201,70 +233,120 @@ class ESP32Reader:
                 time.sleep(1)
 
     def _process_line(self, line):
-        # CAPTURAR PEDALADA: TRUE/FALSE (mesma lógica das teclas QWER)
-        if "Pedalada: True" in line:
-            game_state['is_pedaling'] = True
-            game_state['inactivity_count'] = 0  # Resetar contador de inatividade
-            print(f"✅ ESP32: Pedalando = True - Resetando contador de inatividade")
-            
-        elif "Pedalada: False" in line:
-            game_state['is_pedaling'] = False
-            game_state['inactivity_count'] += 1  # Incrementar contador de mensagens
-            
-            # LÓGICA BASEADA EM TEMPO REAL: Se passou 2 segundos sem pedalada, diminuir energia
-            current_time = time.time()
-            time_since_last_pedal = current_time - game_state['last_pedal_time']
-            
-            if time_since_last_pedal >= 0.5 and game_state['game_active']:  # 0.5 segundos de inatividade (mais rápido)
-                if game_state['player1_energy'] > 0:
-                    # Usar taxa de decaimento das configurações (padrão: 2.5% por segundo)
-                    decay_rate = 2.5  # Taxa padrão do menu
-                    energy_to_decay = (decay_rate * 0.5)  # Decaimento para 0.5 segundos
-                    game_state['player1_energy'] = max(0, game_state['player1_energy'] - energy_to_decay)
-                    print(f"🛑 ESP32: Inatividade por {time_since_last_pedal:.1f}s - Energia diminuindo: {energy_to_decay:.1f}% (Taxa: {decay_rate}%/s)")
-                    game_state['last_pedal_time'] = current_time  # Resetar timer
-                else:
-                    print(f"🛑 ESP32: Inatividade por {time_since_last_pedal:.1f}s - Energia já está em 0%")
-            else:
-                print(f"🛑 ESP32: Pedalada: False (Inatividade #{game_state['inactivity_count']} - Tempo: {time_since_last_pedal:.1f}s)")
-            
-        # CAPTURAR INTERRUPÇÕES DE SENSOR PARA ENERGIA
-        elif "🔍 Interrupção: Sensor HIGH" in line:
+        # Processar mensagens do Arduino Mega com 4 jogadores
+        current_time = time.time()
+        
+        # CAPTURAR PEDALADAS POR JOGADOR
+        if "Jogador" in line and "Pedalada:" in line:
             try:
+                # Extrair número do jogador (1-4)
+                if "Jogador 1:" in line:
+                    player_idx = 0
+                elif "Jogador 2:" in line:
+                    player_idx = 1
+                elif "Jogador 3:" in line:
+                    player_idx = 2
+                elif "Jogador 4:" in line:
+                    player_idx = 3
+                else:
+                    return
+                
+                # Processar estado da pedalada
+                if "Pedalada: True" in line:
+                    game_state['is_pedaling'][player_idx] = True
+                    game_state['inactivity_count'][player_idx] = 0
+                    game_state['last_pedal_time'][player_idx] = current_time
+                    
+                    # Incrementar energia do jogador
+                    if game_state['game_active']:
+                        energy_key = f'player{player_idx + 1}_energy'
+                        if game_state[energy_key] < 100:
+                            game_state[energy_key] = min(100, game_state[energy_key] + 5)  # +5% por pedalada
+                            print(f"✅ Jogador {player_idx + 1}: Pedalando - Energia: {game_state[energy_key]:.1f}%")
+                    
+                elif "Pedalada: False" in line:
+                    game_state['is_pedaling'][player_idx] = False
+                    game_state['inactivity_count'][player_idx] += 1
+                    
+                    # Verificar inatividade e aplicar decaimento
+                    if game_state['game_active']:
+                        time_since_last_pedal = current_time - game_state['last_pedal_time'][player_idx]
+                        
+                        if time_since_last_pedal >= 0.5:  # 0.5 segundos de inatividade
+                            energy_key = f'player{player_idx + 1}_energy'
+                            if game_state[energy_key] > 0:
+                                decay_rate = 2.5  # Taxa padrão do menu
+                                energy_to_decay = (decay_rate * 0.5)  # Decaimento para 0.5 segundos
+                                game_state[energy_key] = max(0, game_state[energy_key] - energy_to_decay)
+                                print(f"🛑 Jogador {player_idx + 1}: Inatividade por {time_since_last_pedal:.1f}s - Energia: {game_state[energy_key]:.1f}%")
+                                game_state['last_pedal_time'][player_idx] = current_time
+                            else:
+                                print(f"🛑 Jogador {player_idx + 1}: Inatividade por {time_since_last_pedal:.1f}s - Energia já está em 0%")
+                        else:
+                            print(f"🛑 Jogador {player_idx + 1}: Pedalada: False (Inatividade #{game_state['inactivity_count'][player_idx]})")
+            
+            except Exception as e:
+                print(f"❌ Erro ao processar mensagem do jogador: {e}")
+        
+        # CAPTURAR CONTADORES DE PEDALADAS
+        elif "Total de pedaladas:" in line:
+            try:
+                # Extrair número do jogador e contador
+                if "Jogador 1:" in line:
+                    player_idx = 0
+                elif "Jogador 2:" in line:
+                    player_idx = 1
+                elif "Jogador 3:" in line:
+                    player_idx = 2
+                elif "Jogador 4:" in line:
+                    player_idx = 3
+                else:
+                    return
+                
+                # Extrair contador
+                if "Total de pedaladas:" in line:
+                    count_str = line.split("Total de pedaladas:")[1].strip()
+                    game_state['pedal_count'][player_idx] = int(count_str)
+                    print(f"📊 Jogador {player_idx + 1}: Total de pedaladas: {count_str}")
+            
+            except Exception as e:
+                print(f"❌ Erro ao processar contador de pedaladas: {e}")
+        
+        # CAPTURAR INTERRUPÇÕES DE SENSOR
+        elif "🔍 Jogador" in line and "Pedalada #" in line:
+            try:
+                # Extrair número do jogador e da pedalada
+                if "Jogador 1:" in line:
+                    player_idx = 0
+                elif "Jogador 2:" in line:
+                    player_idx = 1
+                elif "Jogador 3:" in line:
+                    player_idx = 2
+                elif "Jogador 4:" in line:
+                    player_idx = 3
+                else:
+                    return
+                
                 # Extrair número da pedalada
                 if "Pedalada #" in line:
                     pedal_num = line.split("Pedalada #")[1].split(" ")[0]
-                    game_state['pedal_count'] = int(pedal_num)
-                    print(f"🚴 INTERRUPÇÃO DETECTADA - Pedalada #{pedal_num}")
-                    
-                    # INCREMENTAR ENERGIA
-                    if game_state['game_active']:
-                        game_state['player1_energy'] += 3.0
-                        if game_state['player1_energy'] > 100:
-                            game_state['player1_energy'] = 100
-                        print(f"🚴 PEDALADA #{pedal_num} - Energia: {game_state['player1_energy']:.1f}%")
-                    else:
-                        # JOGO SEMPRE DISPONÍVEL - iniciar automaticamente com primeira pedalada
-                        game_state['game_active'] = True
-                        game_state['player1_energy'] = 3.0
-                        print(f"🎮 Jogo iniciado automaticamente com pedalada #{pedal_num}!")
-                        print(f"🚴 PEDALADA #{pedal_num} - Energia: {game_state['player1_energy']:.1f}%")
-                        
+                    print(f"🚴 INTERRUPÇÃO DETECTADA - Jogador {player_idx + 1}: Pedalada #{pedal_num}")
+            
             except Exception as e:
                 print(f"❌ Erro ao processar interrupção: {e}")
-                
+        
         # Atualizar contador quando disponível
         elif line.startswith("Pedaladas:"):
             try:
                 count_str = line.split(":")[1].strip()
                 new_count = int(count_str)
-                if new_count > game_state['pedal_count']:
-                    game_state['pedal_count'] = new_count
+                if new_count > game_state['pedal_count'][0]:  # Usar primeiro jogador como referência
+                    game_state['pedal_count'][0] = new_count
             except:
                 pass
 
-# Instância global do leitor ESP32
-esp32_reader = ESP32Reader()
+# Instância global do leitor Arduino Mega
+arduino_reader = ArduinoMegaReader()
 
 class BikeJJHTTPHandler(http.server.SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
@@ -291,16 +373,30 @@ class BikeJJHTTPHandler(http.server.SimpleHTTPRequestHandler):
         elif self.path == '/api/start-game':
             # Iniciar jogo
             game_state['game_active'] = True
-            game_state['player1_energy'] = 0
-            print("🎮 Jogo iniciado")
+            # Resetar energia de todos os jogadores
+            for i in range(4):
+                game_state[f'player{i+1}_energy'] = 0
+                game_state['pedal_count'][i] = 0
+                game_state['is_pedaling'][i] = False
+                game_state['inactivity_count'][i] = 0
+                game_state['last_pedal_time'][i] = 0
+                game_state['inactivity_timer'][i] = 0
+            print("🎮 Jogo iniciado para 4 jogadores")
             self.send_response(200)
             self.end_headers()
             self.wfile.write(b"OK")
         elif self.path == '/api/reset-game':
             # Resetar jogo
             game_state['game_active'] = False
-            game_state['player1_energy'] = 0
-            print("🔄 Jogo resetado")
+            # Resetar energia de todos os jogadores
+            for i in range(4):
+                game_state[f'player{i+1}_energy'] = 0
+                game_state['pedal_count'][i] = 0
+                game_state['is_pedaling'][i] = False
+                game_state['inactivity_count'][i] = 0
+                game_state['last_pedal_time'][i] = 0
+                game_state['inactivity_timer'][i] = 0
+            print("🔄 Jogo resetado para 4 jogadores")
             self.send_response(200)
             self.end_headers()
             self.wfile.write(b"OK")
@@ -313,7 +409,7 @@ class BikeJJHTTPHandler(http.server.SimpleHTTPRequestHandler):
             response = {
                 'ports': ports,
                 'current_port': SERIAL_PORT,
-                'connected': esp32_reader.running if esp32_reader else False
+                'connected': arduino_reader.running if arduino_reader else False
             }
             self.wfile.write(json.dumps(response).encode())
         elif self.path == '/api/serial/status':
@@ -323,7 +419,7 @@ class BikeJJHTTPHandler(http.server.SimpleHTTPRequestHandler):
             self.end_headers()
             status = {
                 'current_port': SERIAL_PORT,
-                'connected': esp32_reader.running if esp32_reader else False,
+                'connected': arduino_reader.running if arduino_reader else False,
                 'baudrate': SERIAL_BAUDRATE
             }
             self.wfile.write(json.dumps(status).encode())
@@ -359,11 +455,11 @@ def main():
     # Carregar configuração da porta serial
     load_serial_config()
     
-    # Iniciar leitor ESP32
+    # Iniciar leitor Arduino Mega
     if SERIAL_PORT:
-        esp32_reader.start()
+        arduino_reader.start()
     else:
-        print("⚠️ ESP32 não conectado - apenas controles de teclado disponíveis")
+        print("⚠️ Arduino Mega não conectado - apenas controles de teclado disponíveis")
     
     # Iniciar servidor HTTP
     with socketserver.TCPServer(("", HTTP_PORT), BikeJJHTTPHandler) as httpd:
@@ -376,7 +472,7 @@ def main():
             httpd.serve_forever()
         except KeyboardInterrupt:
             print("\n🛑 Parando servidor...")
-            esp32_reader.stop()
+            arduino_reader.stop()
 
 if __name__ == "__main__":
     main()

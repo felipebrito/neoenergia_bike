@@ -625,7 +625,7 @@ class BikeJJGame {
         const oldEnergy = player.energy;
         player.energy = Math.min(this.maxEnergy, player.energy + this.energyGainRate);
         
-        // Verificar se atingiu energia máxima
+                // Verificar se atingiu energia máxima
         if (player.energy >= this.maxEnergy) {
             this.endGameWithWinner(player);
             return;
