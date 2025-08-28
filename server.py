@@ -38,25 +38,10 @@ def load_serial_config():
                     print(f"⚠️ Porta configurada inválida: {loaded_port}")
                     SERIAL_PORT = None
         else:
-            # Tentar detectar automaticamente uma porta válida
-            ports = list_available_ports()
-            valid_ports = [p for p in ports if is_valid_serial_port(p['port'])]
-            if valid_ports:
-                # Priorizar portas COM no Windows
-                if platform.system() == 'Windows':
-                    com_ports = [p for p in valid_ports if p['port'].upper().startswith('COM')]
-                    if com_ports:
-                        SERIAL_PORT = com_ports[0]['port']
-                    else:
-                        SERIAL_PORT = valid_ports[0]['port']
-                else:
-                    SERIAL_PORT = valid_ports[0]['port']
-                
-                save_serial_config(SERIAL_PORT)
-                print(f"🔍 Porta válida detectada automaticamente: {SERIAL_PORT}")
-            else:
-                print("⚠️ Nenhuma porta serial válida detectada")
-                SERIAL_PORT = None
+            # NÃO detectar automaticamente - deixar usuário configurar
+            print("💡 Nenhuma porta configurada automaticamente")
+            print("🔧 Use o configurador serial para configurar manualmente")
+            SERIAL_PORT = None
     except Exception as e:
         print(f"❌ Erro ao carregar configuração: {e}")
         SERIAL_PORT = None
@@ -80,13 +65,19 @@ def is_valid_serial_port(port):
         if pattern.lower() in port.lower():
             return False
     
-    # Portas válidas para ESP32/Arduino
+    # No Windows, portas COM são sempre válidas
+    if platform.system() == 'Windows':
+        if port.upper().startswith('COM'):
+            return True
+        else:
+            return False
+    
+    # No macOS/Linux, portas cu/tty são válidas
     valid_patterns = [
         'usbserial',
         'usbmodem',
         'ttyUSB',
         'ttyACM',
-        'COM',
         'cu.usbserial',
         'cu.usbmodem'
     ]
@@ -94,10 +85,6 @@ def is_valid_serial_port(port):
     for pattern in valid_patterns:
         if pattern.lower() in port.lower():
             return True
-    
-    # No Windows, portas COM são sempre válidas se não contiverem padrões inválidos
-    if platform.system() == 'Windows' and port.upper().startswith('COM'):
-        return True
     
     return False
 
@@ -501,14 +488,33 @@ class BikeJJHTTPHandler(http.server.BaseHTTPRequestHandler):
 def main():
     print("🚀 Iniciando servidor BikeJJ...")
     
-    # Carregar configuração da porta serial
+    # Carregar configuração da porta serial (mas não conectar automaticamente)
     load_serial_config()
     
-    # Iniciar leitor Arduino Mega
+    # NÃO iniciar leitor Arduino Mega automaticamente
+    # Deixar o usuário configurar via interface
     if SERIAL_PORT:
-        arduino_reader.start()
+        print(f"📁 Porta configurada: {SERIAL_PORT}")
+        print("💡 Use o configurador serial para conectar")
     else:
-        print("⚠️ Arduino Mega não conectado - apenas controles de teclado disponíveis")
+        print("⚠️ Nenhuma porta serial configurada")
+        print("💡 Use o configurador serial para configurar")
+    
+    print("🔧 IMPORTANTE: Configure a porta serial antes de iniciar o jogo!")
+    
+    # Mensagem específica para Windows
+    if platform.system() == 'Windows':
+        print("💻 Windows detectado!")
+        print("🔌 Portas COM disponíveis: COM3, COM4, COM5, etc.")
+        print("📱 Conecte o Arduino Mega via USB")
+        print("🌐 Abra: http://localhost:9000/serial_config.html")
+        print("⚙️ Selecione a porta COM correta e clique em 'Conectar'")
+    else:
+        print("🍎 macOS/Linux detectado!")
+        print("🔌 Portas disponíveis: /dev/cu.usbserial-*, /dev/ttyUSB*")
+        print("📱 Conecte o Arduino Mega via USB")
+        print("🌐 Abra: http://localhost:9000/serial_config.html")
+        print("⚙️ Selecione a porta correta e clique em 'Conectar'")
     
     # Iniciar servidor HTTP
     with socketserver.TCPServer(("", HTTP_PORT), BikeJJHTTPHandler) as httpd:
@@ -521,7 +527,8 @@ def main():
             httpd.serve_forever()
         except KeyboardInterrupt:
             print("\n🛑 Parando servidor...")
-            arduino_reader.stop()
+            if arduino_reader and arduino_reader.running:
+                arduino_reader.stop()
 
 if __name__ == "__main__":
     main()
