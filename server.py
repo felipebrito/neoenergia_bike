@@ -349,10 +349,7 @@ class ArduinoMegaReader:
 # Instância global do leitor Arduino Mega
 arduino_reader = ArduinoMegaReader()
 
-class BikeJJHTTPHandler(http.server.SimpleHTTPRequestHandler):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, directory=".", **kwargs)
-
+class BikeJJHTTPHandler(http.server.BaseHTTPRequestHandler):
     def end_headers(self):
         # Adicionar CORS headers
         self.send_header('Access-Control-Allow-Origin', '*')
@@ -367,6 +364,7 @@ class BikeJJHTTPHandler(http.server.SimpleHTTPRequestHandler):
     def do_GET(self):
         print(f"🔍 GET request: {self.path}")
         
+        # Rotas da API têm prioridade
         if self.path == '/api/state':
             # Retornar estado do jogo
             print(f"📊 Retornando estado do jogo: {game_state}")
@@ -374,6 +372,7 @@ class BikeJJHTTPHandler(http.server.SimpleHTTPRequestHandler):
             self.send_header('Content-Type', 'application/json')
             self.end_headers()
             self.wfile.write(json.dumps(game_state).encode())
+            return
         elif self.path == '/api/start-game':
             # Iniciar jogo
             game_state['game_active'] = True
@@ -389,6 +388,7 @@ class BikeJJHTTPHandler(http.server.SimpleHTTPRequestHandler):
             self.send_response(200)
             self.end_headers()
             self.wfile.write(b"OK")
+            return
         elif self.path == '/api/reset-game':
             # Resetar jogo
             game_state['game_active'] = False
@@ -404,6 +404,7 @@ class BikeJJHTTPHandler(http.server.SimpleHTTPRequestHandler):
             self.send_response(200)
             self.end_headers()
             self.wfile.write(b"OK")
+            return
         elif self.path == '/api/serial/ports':
             # Listar portas seriais disponíveis
             self.send_response(200)
@@ -416,6 +417,7 @@ class BikeJJHTTPHandler(http.server.SimpleHTTPRequestHandler):
                 'connected': arduino_reader.running if arduino_reader else False
             }
             self.wfile.write(json.dumps(response).encode())
+            return
         elif self.path == '/api/serial/status':
             # Status da conexão serial
             self.send_response(200)
@@ -427,9 +429,52 @@ class BikeJJHTTPHandler(http.server.SimpleHTTPRequestHandler):
                 'baudrate': SERIAL_BAUDRATE
             }
             self.wfile.write(json.dumps(status).encode())
-        else:
-            # Servir arquivos estáticos
-            super().do_GET()
+            return
+        
+        # Servir arquivos estáticos
+        try:
+            # Mapear rotas para arquivos
+            if self.path == '/':
+                self.path = '/index.html'
+            elif self.path == '/serial':
+                self.path = '/serial_config.html'
+            
+            # Verificar se o arquivo existe
+            file_path = os.path.join('.', self.path.lstrip('/'))
+            if os.path.exists(file_path) and os.path.isfile(file_path):
+                # Determinar tipo de conteúdo
+                if file_path.endswith('.html'):
+                    content_type = 'text/html'
+                elif file_path.endswith('.css'):
+                    content_type = 'text/css'
+                elif file_path.endswith('.js'):
+                    content_type = 'application/javascript'
+                elif file_path.endswith('.json'):
+                    content_type = 'application/json'
+                else:
+                    content_type = 'application/octet-stream'
+                
+                # Ler e enviar arquivo
+                with open(file_path, 'rb') as f:
+                    content = f.read()
+                
+                self.send_response(200)
+                self.send_header('Content-Type', content_type)
+                self.end_headers()
+                self.wfile.write(content)
+            else:
+                # Arquivo não encontrado
+                self.send_response(404)
+                self.send_header('Content-Type', 'text/plain')
+                self.end_headers()
+                self.wfile.write(b"File not found")
+                
+        except Exception as e:
+            print(f"❌ Erro ao servir arquivo {self.path}: {e}")
+            self.send_response(500)
+            self.send_header('Content-Type', 'text/plain')
+            self.end_headers()
+            self.wfile.write(f"Internal server error: {str(e)}".encode())
     
     def do_POST(self):
         if self.path == '/api/serial/change-port':
