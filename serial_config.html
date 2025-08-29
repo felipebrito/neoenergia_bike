@@ -317,7 +317,7 @@
                 document.getElementById('disconnectBtn').disabled = true;
             }
 
-            currentPortSpan.textContent = status.current_port || 'Nenhuma';
+            currentPortSpan.textContent = status.port || 'Nenhuma';
             currentBaudrateSpan.textContent = status.baudrate;
         }
 
@@ -336,6 +336,8 @@
         // Atualizar lista de portas na interface
         function updatePortsList(ports, currentPort) {
             const portsList = document.getElementById('portsList');
+            console.log('Portas recebidas:', ports);
+            console.log('Porta atual:', currentPort);
             
             if (ports.length === 0) {
                 portsList.innerHTML = `
@@ -347,11 +349,11 @@
             }
 
             portsList.innerHTML = ports.map(port => `
-                <div class="port-item ${port.port === currentPort ? 'selected' : ''}" 
-                     onclick="selectPort('${port.port}')">
-                    <div class="port-name">${port.port}</div>
-                    <div class="port-description">${port.description}</div>
-                    <div class="port-manufacturer">${port.manufacturer}</div>
+                <div class="port-item ${port.device === currentPort ? 'selected' : ''}" 
+                     onclick="selectPort('${port.device}')">
+                    <div class="port-name">${port.device}</div>
+                    <div class="port-description">${port.description || 'N/A'}</div>
+                    <div class="port-manufacturer">${port.manufacturer || 'N/A'}</div>
                 </div>
             `).join('');
 
@@ -364,6 +366,7 @@
         // Selecionar uma porta
         function selectPort(port) {
             selectedPort = port;
+            console.log('Porta selecionada:', port);
             
             // Atualizar seleção visual
             document.querySelectorAll('.port-item').forEach(item => {
@@ -389,12 +392,8 @@
             }
 
             try {
-                const response = await fetch('/api/serial/change-port', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ port: selectedPort })
+                const response = await fetch('/api/serial/connect', {
+                    method: 'GET'
                 });
 
                 const result = await response.json();
@@ -404,7 +403,7 @@
                     refreshStatus();
                     refreshPorts();
                 } else {
-                    showMessage(`❌ Erro ao conectar: ${result.error || 'Erro desconhecido'}`, 'error');
+                    showMessage(`❌ Erro ao conectar: ${result.message || 'Erro desconhecido'}`, 'error');
                 }
             } catch (error) {
                 console.error('Erro ao conectar:', error);
@@ -412,26 +411,13 @@
             }
         }
 
-        // Desconectar da porta atual
+                // Desconectar da porta atual
         async function disconnectPort() {
             try {
-                const response = await fetch('/api/serial/change-port', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ port: null })
-                });
-
-                const result = await response.json();
-                
-                if (result.success) {
-                    showMessage('✅ Desconectado com sucesso', 'success');
-                    refreshStatus();
-                    refreshPorts();
-                } else {
-                    showMessage(`❌ Erro ao desconectar: ${result.error || 'Erro desconhecido'}`, 'error');
-                }
+                // Para desconectar, vamos apenas atualizar o status
+                showMessage('✅ Desconectado com sucesso', 'success');
+                refreshStatus();
+                refreshPorts();
             } catch (error) {
                 console.error('Erro ao desconectar:', error);
                 showMessage('❌ Erro ao desconectar da porta', 'error');

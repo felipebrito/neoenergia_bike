@@ -1,6 +1,6 @@
 # 🚴 BikeJJ - Competição de Energia com Bicicletas
 
-> **Uma aplicação interativa de competição onde 4 jogadores competem pedalando para gerar energia e vencer! Com suporte completo para ESP32 e sensores reais!**
+> **Uma aplicação interativa de competição onde 4 jogadores competem pedalando para gerar energia e vencer! Com suporte completo para Arduino Mega e sensores reais!**
 
 ## 📖 Índice
 
@@ -8,7 +8,7 @@
 - [🚀 Como Funciona](#-como-funciona)
 - [🎮 Como Jogar](#-como-jogar)
 - [⚡ Sistema de Física](#-sistema-de-física)
-- [🔌 Integração ESP32](#-integração-esp32)
+- [🔌 Integração Arduino Mega](#-integração-arduino-mega)
 - [⚙️ Configurações](#️-configurações)
 - [🛠️ Tecnologias Utilizadas](#️-tecnologias-utilizadas)
 - [📁 Estrutura do Projeto](#-estrutura-do-projeto)
@@ -28,12 +28,14 @@ O **BikeJJ** é um sistema de competição que simula a geração de energia atr
 ### 🌟 **Características Principais:**
 - **4 jogadores simultâneos** competindo em tempo real
 - **Física realista** das barras de energia com decaimento natural
-- **Interface moderna** e responsiva com efeitos visuais espetaculares
-- **Integração ESP32** para sensores reais de bicicleta
-- **Sistema de reset completo** que garante estado inicial perfeito
+- **Interface moderna** e responsiva com animações GSAP suaves
+- **Integração Arduino Mega** para sensores reais de bicicleta
+- **Sistema de reset robusto** sem loops infinitos
 - **Configurações personalizáveis** em tempo real
 - **Persistência de dados** no navegador
 - **Auto-reinício** após vitória com contador regressivo
+- **Animações orgânicas** com easing suave e efeitos visuais
+- **Modo offline completo** com modal de controle quando servidor indisponível
 
 ---
 
@@ -41,7 +43,7 @@ O **BikeJJ** é um sistema de competição que simula a geração de energia atr
 
 ### 🔄 **Fluxo do Jogo:**
 1. **Início**: 4 jogadores começam com 0% de energia
-2. **Competição**: Cada um pedala usando teclas específicas ou sensor ESP32
+2. **Competição**: Cada um pedala usando teclas específicas ou sensor Arduino Mega
 3. **Física**: Energia sobe com pedaladas, desce naturalmente quando não pedala
 4. **Vitória**: Primeiro a 100% de energia vence!
 5. **Congelamento**: Todos os jogadores são congelados visualmente
@@ -59,19 +61,19 @@ O **BikeJJ** é um sistema de competição que simula a geração de energia atr
 ## 🎮 Como Jogar
 
 ### ⌨️ **Controles por Jogador:**
-| Jogador | Tecla | Cor da Barra | Sensor ESP32 |
-|---------|--------|---------------|--------------|
+| Jogador | Tecla | Cor da Barra | Sensor Arduino |
+|---------|--------|---------------|----------------|
 | **Jogador 1** | **Q** | 🔴 Vermelha | ✅ **SIM** |
-| **Jogador 2** | **W** | 🟠 Laranja | ❌ Não |
-| **Jogador 3** | **E** | 🟡 Amarela | ❌ Não |
-| **Jogador 4** | **R** | 🟢 Verde | ❌ Não |
+| **Jogador 2** | **W** | 🟠 Laranja | ✅ **SIM** |
+| **Jogador 3** | **E** | 🟡 Amarela | ✅ **SIM** |
+| **Jogador 4** | **R** | 🟢 Verde | ✅ **SIM** |
 
 ### 🎯 **Objetivo:**
 > **Ser o primeiro a atingir 100% de energia!**
 
 ### 📋 **Passo a Passo:**
 1. **Clique em "Iniciar Jogo"** para começar
-2. **Use as teclas Q, W, E, R** para pedalar (ou sensor ESP32 para Jogador 1)
+2. **Use as teclas Q, W, E, R** para pedalar (ou sensores Arduino para todos)
 3. **Mantenha a energia alta** para pontuar mais
 4. **A energia diminui naturalmente** quando não está pedalando
 5. **Primeiro a 100% vence** e recebe efeitos especiais!
@@ -85,13 +87,14 @@ O **BikeJJ** é um sistema de competição que simula a geração de energia atr
 - **Taxa de ganho**: Configurável (1% a 10% por pedalada)
 - **Progressão**: Aumenta gradualmente com cada pedalada
 - **Máximo**: 100% de energia (fixo)
-- **ESP32**: Jogador 1 pode usar sensor real
+- **Arduino Mega**: Todos os jogadores podem usar sensores reais
 
 ### 📉 **Decaimento Natural:**
 - **Taxa de decaimento**: Configurável (0.1% a 15% por segundo)
 - **Física realista**: Simula perda de velocidade natural
 - **Consistência**: Recompensa jogadores constantes
-- **Baseado em tempo**: Decaimento ocorre a cada 0.5 segundos de inatividade
+- **Baseado em tempo**: Decaimento ocorre a cada 0.1 segundos de inatividade
+- **Timeout inteligente**: 1.5 segundos de inatividade para reset automático
 
 ### 🏆 **Sistema de Pontuação:**
 - **Pontos base**: 0.5 por pedalada
@@ -100,42 +103,43 @@ O **BikeJJ** é um sistema de competição que simula a geração de energia atr
 
 ---
 
-## 🔌 Integração ESP32
+## 🔌 Integração Arduino Mega
 
 ### 🚴 **Hardware Suportado:**
-- **ESP32**: Microcontrolador principal
-- **Sensor Indutivo**: Detecta pedaladas reais
+- **Arduino Mega**: Microcontrolador principal
+- **Sensores Indutivos**: Detecta pedaladas reais para todos os jogadores
 - **Conexão**: USB Serial (COM/Serial)
-- **Porta**: Configurável no servidor
+- **Porta**: Detecção automática no servidor
 
 ### 📡 **Comunicação:**
 - **Protocolo**: Serial USB
 - **Formato**: Mensagens de texto UTF-8
-- **Frequência**: Polling HTTP a cada 50ms
-- **Latência**: <100ms para resposta
+- **Frequência**: Polling HTTP adaptativo (60-120 FPS)
+- **Latência**: <50ms para resposta
+- **Buffering**: Sistema de buffer para múltiplas pedaladas consecutivas
 
-### 🔧 **Firmware ESP32:**
+### 🔧 **Firmware Arduino:**
 ```arduino
 // Mensagens enviadas:
-🔍 Interrupção: Sensor HIGH - Pedalada #X
+🔍 Jogador X: Pedalada #Y detectada
 Pedalada: True
 Pedalada: False (após inatividade)
-Pedaladas: X (contador total)
+Pedaladas: Y (contador total)
 ```
 
 ### ⚙️ **Configuração do Servidor:**
 ```python
-# Em server.py - ajuste a porta serial
-SERIAL_PORT = '/dev/cu.usbserial-2130'  # macOS
-# SERIAL_PORT = 'COM3'                   # Windows
-# SERIAL_PORT = '/dev/ttyUSB0'           # Linux
+# Em robust_server.py - detecção automática de porta
+# O servidor detecta automaticamente a porta do Arduino
+# Não é necessário configurar manualmente
 ```
 
-### 🎮 **Funcionalidades ESP32:**
+### 🎮 **Funcionalidades Arduino:**
 - **Auto-início**: Jogo inicia automaticamente com primeira pedalada
 - **Decaimento inteligente**: Baseado em tempo real de inatividade
 - **Debounce**: Evita múltiplas leituras da mesma pedalada
 - **Status em tempo real**: Atualização contínua da barra de energia
+- **Sistema de prontidão**: Cada jogador deve dar uma pedalada para "estar pronto"
 
 ---
 
@@ -173,28 +177,31 @@ Clique no botão **"⚙️ Configurações"** para acessar:
 - **HTML5**: Estrutura semântica e moderna
 - **CSS3**: Estilos avançados com gradientes e animações
 - **JavaScript ES6+**: Lógica do jogo e física em tempo real
+- **GSAP**: Biblioteca profissional para animações suaves e orgânicas
 
 ### **Backend:**
-- **Python 3.x**: Servidor HTTP com comunicação serial
-- **PySerial**: Biblioteca para comunicação com ESP32
+- **Python 3.x**: Servidor HTTP robusto com comunicação serial
+- **PySerial**: Biblioteca para comunicação com Arduino Mega
 - **HTTP Polling**: Comunicação em tempo real com frontend
+- **Multithreading**: Threads separados para serial e decaimento
 
 ### **Hardware:**
-- **ESP32**: Microcontrolador para sensores
+- **Arduino Mega**: Microcontrolador para sensores
 - **Arduino IDE**: Desenvolvimento do firmware
-- **Sensor Indutivo**: Detecção de pedaladas
+- **Sensores Indutivos**: Detecção de pedaladas para todos os jogadores
 
 ### **Características Técnicas:**
-- **60 FPS**: Loop de jogo otimizado para suavidade
+- **60-120 FPS**: Polling adaptativo baseado na atividade
 - **Responsivo**: Funciona em desktop, tablet e mobile
 - **Modular**: Código organizado em classes JavaScript
 - **Performance**: Otimizado para animações suaves
-- **Tempo real**: Atualização a cada 50ms
+- **Tempo real**: Atualização adaptativa baseada na atividade
 
-### **Animações CSS:**
-- **Transições**: Suaves entre estados
-- **Keyframes**: Animações complexas e personalizadas
-- **GPU**: Aceleração por hardware para melhor performance
+### **Animações GSAP:**
+- **Easing suave**: `power2.out` para ganhos, `power1.out` para perdas
+- **Duração otimizada**: 1.5s para ganhos, 2.0s para perdas
+- **Efeitos visuais**: Partículas, ripple, pulse suave
+- **Performance**: Aceleração por hardware para melhor fluidez
 
 ---
 
@@ -205,9 +212,9 @@ BikeJJ/
 ├── 📄 index.html              # Interface principal do jogo
 ├── 🎨 styles.css              # Estilos, animações e efeitos visuais
 ├── ⚙️ script.js               # Lógica do jogo, física e controles
-├── 🐍 server.py               # Servidor Python com ESP32
-├── 🔧 esp32_bike_sensor/      # Firmware Arduino para ESP32
-│   └── esp32_bike_sensor.ino  # Código principal do ESP32
+├── 🐍 robust_server.py        # Servidor Python robusto com Arduino
+├── 🔧 esp32_bike_sensor/      # Firmware Arduino para sensores
+│   └── esp32_bike_sensor.ino  # Código principal dos sensores
 ├── 📊 reports.html            # Dashboard de relatórios
 ├── 📊 reports.js              # Lógica dos relatórios
 ├── 📊 reports.css             # Estilos dos relatórios
@@ -219,29 +226,34 @@ BikeJJ/
 - **Estrutura**: Layout das 4 barras de energia
 - **Controles**: Botões de jogo e configurações
 - **Responsividade**: Adapta-se a diferentes tamanhos de tela
+- **GSAP**: Biblioteca integrada para animações suaves
 
 ### **🎨 styles.css:**
 - **Design**: Interface moderna com gradientes
 - **Animações**: Efeitos de vitória tipo cassino
 - **Responsivo**: CSS Grid para layout adaptativo
 - **Congelamento**: Efeitos visuais para jogadores congelados
+- **Partículas**: Estilos para sistema de partículas GSAP
 
 ### **⚙️ script.js:**
 - **Classe principal**: `BikeJJGame` gerencia todo o jogo
 - **Física**: Cálculos de energia e decaimento
 - **Eventos**: Controles por teclado e interface
 - **Persistência**: Sistema de configurações salvas
-- **Reset completo**: Sistema robusto de reinicialização
+- **Reset robusto**: Sistema estável de reinicialização sem loops
 - **Congelamento**: Sistema de pausa visual para vencedores
+- **Animações GSAP**: Sistema completo de animações suaves
 
-### **🐍 server.py:**
+### **🐍 robust_server.py:**
 - **Servidor HTTP**: Serve arquivos estáticos e API
-- **Comunicação Serial**: Integração com ESP32
+- **Comunicação Serial**: Integração com Arduino Mega
 - **API REST**: Endpoints para estado do jogo
 - **Processamento**: Lógica de pedaladas e decaimento
+- **Multithreading**: Threads separados para melhor performance
+- **Auto-detecção**: Porta serial detectada automaticamente
 
 ### **🔧 esp32_bike_sensor.ino:**
-- **Firmware**: Código para ESP32
+- **Firmware**: Código para sensores de bicicleta
 - **Sensor**: Leitura de sensor indutivo
 - **Debounce**: Prevenção de múltiplas leituras
 - **Serial**: Comunicação com servidor Python
@@ -254,40 +266,40 @@ BikeJJ/
 - Navegador web moderno (Chrome, Firefox, Safari, Edge)
 - Python 3.x (para servidor local)
 - Suporte a CSS Grid e ES6+
-- ESP32 (opcional, para sensor real)
+- Arduino Mega (opcional, para sensores reais)
 
-### **🔌 Com ESP32 (Recomendado):**
+### **🔌 Com Arduino Mega (Recomendado):**
 ```bash
-# 1. Conectar ESP32 via USB
-# 2. Verificar porta serial (ajustar em server.py)
-# 3. Executar servidor
-python3 server.py
+# 1. Conectar Arduino Mega via USB
+# 2. O servidor detecta automaticamente a porta
+# 3. Executar servidor robusto
+python3 robust_server.py
 
 # 4. Acessar no navegador:
-# http://localhost:9003
+# http://localhost:9000
 ```
 
-### **🌐 Sem ESP32 (Teclado apenas):**
+### **🌐 Sem Arduino (Teclado apenas):**
 ```bash
 # Executar servidor
-python3 server.py
+python3 robust_server.py
 
 # Acessar no navegador:
-# http://localhost:9003
+# http://localhost:9000
 ```
 
 ### **📊 Dashboard de Relatórios:**
-- **Acesso**: http://localhost:9003/reports.html
+- **Acesso**: http://localhost:9000/reports.html
 - **Tema**: Dark mode consistente com o jogo
 - **Gráficos**: Chart.js para visualização de dados
 - **Animações**: GSAP para transições suaves
 - **Funcionalidades**: Filtros, exportação e reset completo
 
 ### **⚠️ Importante:**
-- **Use um servidor local** para melhor performance
+- **Use o servidor robusto** para melhor performance e estabilidade
 - **Evite abrir index.html diretamente** (problemas de persistência)
-- **Porta 9003** é a padrão configurada
-- **ESP32 deve estar conectado** para funcionalidade completa
+- **Porta 9000** é a padrão configurada
+- **Arduino Mega deve estar conectado** para funcionalidade completa
 
 ---
 
@@ -319,6 +331,21 @@ python3 server.py
 - **Interação**: Controles desabilitados
 - **Transição**: Efeito suave de congelamento
 
+### **✨ Animações GSAP Suaves:**
+- **Movimento orgânico**: Easing natural para todas as animações
+- **Partículas de energia**: Sistema de partículas flutuantes
+- **Efeito ripple**: Ondulações durante ganho de energia
+- **Pulse suave**: Escala sutil para ganhos grandes
+- **Estabilização**: Transição suave para estado final
+
+### **🔌 Modo Offline Inteligente:**
+- **Detecção automática**: Identifica quando servidor está indisponível
+- **Modal de controle**: Interface completa para gerenciar modo offline
+- **Jogo funcional**: Todas as funcionalidades disponíveis offline
+- **Auto-reconexão**: Tenta reconectar automaticamente ao servidor
+- **Status visual**: Indicadores de conexão na interface principal
+- **Configurações offline**: Acesso completo às configurações do jogo
+
 ---
 
 ## 🔧 Personalizações
@@ -342,7 +369,7 @@ python3 server.py
 
 ### **🎨 Personalização Visual:**
 - **Cores**: Modifique as variáveis CSS
-- **Animações**: Ajuste durações e efeitos
+- **Animações**: Ajuste durações e efeitos GSAP
 - **Layout**: Adapte para diferentes números de jogadores
 
 ---
@@ -365,7 +392,7 @@ python3 server.py
 
 ## 🎯 Roadmap Futuro
 
-### **🔄 Fase 2: Melhorias ESP32 (Em desenvolvimento)**
+### **🔄 Fase 2: Melhorias Arduino (Em desenvolvimento)**
 - **Múltiplos sensores**: 4 sensores para todos os jogadores
 - **Calibração**: Sistema de calibração automática
 - **WiFi**: Comunicação sem fio (opcional)
@@ -391,8 +418,8 @@ python3 server.py
 ### **💡 Áreas para Contribuição:**
 - **Interface**: Melhorias no design e UX
 - **Física**: Otimizações no sistema de energia
-- **Animações**: Novos efeitos visuais
-- **ESP32**: Melhorias no firmware
+- **Animações**: Novos efeitos visuais GSAP
+- **Arduino**: Melhorias no firmware
 - **Documentação**: Traduções e melhorias
 
 ### **🔧 Como Contribuir:**
@@ -443,7 +470,8 @@ Este projeto é de código aberto e está disponível sob a licença **MIT**.
 - **Comunidade open source** por inspiração
 - **Contribuidores** que ajudaram no desenvolvimento
 - **Usuários** que testaram e deram feedback
-- **Comunidade ESP32/Arduino** por suporte técnico
+- **Comunidade Arduino** por suporte técnico
+- **GSAP** por animações profissionais e suaves
 
 ---
 
@@ -453,5 +481,5 @@ Este projeto é de código aberto e está disponível sob a licença **MIT**.
 
 ---
 
-*Última atualização: Janeiro 2025*
-*Versão: 2.0.0 - ESP32 + Reset Completo*
+*Última atualização: Agosto 2025*
+*Versão: 3.0.0 - Arduino Mega + GSAP + Reset Robusto*

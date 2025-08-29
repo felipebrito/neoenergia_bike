@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Servidor BikeJJ simplificado
-Lê Arduino Mega e serve HTML com atualizações em tempo real
+Lê ESP32 e serve HTML com atualizações em tempo real
 """
 
 import serial
@@ -47,11 +47,11 @@ def load_serial_config():
         SERIAL_PORT = None
 
 def is_valid_serial_port(port):
-    """Verificar se uma porta serial é válida para Arduino Mega"""
+    """Verificar se uma porta serial é válida para ESP32/Arduino"""
     if not port:
         return False
     
-    # Portas que não são válidas para Arduino Mega
+    # Portas que não são válidas para ESP32/Arduino
     invalid_patterns = [
         'debug-console',
         'Bluetooth',
@@ -176,9 +176,9 @@ game_state = {
     'is_pedaling': [False, False, False, False],  # Estado de pedalada para cada jogador
     'inactivity_count': [0, 0, 0, 0],  # Contador de inatividade para cada jogador
     'last_pedal_time': [0, 0, 0, 0],  # Timestamp da última pedalada para cada jogador
-    'inactivity_timer': [0, 0, 0, 0],  # Timer de inatividade para cada jogador
-    'players_ready': [False, False, False, False],  # NOVO: Jogadores que deram primeira pedalada
-    'game_can_start': False  # NOVO: Se todos os jogadores estão prontos
+    'inactivity_timer': [0, 0, 0, 0],
+    'players_ready': [False, False, False, False], # Novo campo para indicar jogadores prontos
+    'game_can_start': False # Novo campo para indicar se o jogo pode iniciar
 }
 
 # Timer para decaimento de energia (funciona independentemente do jogo)
@@ -359,7 +359,13 @@ class ArduinoMegaReader:
                     pedal_num = line.split("Pedalada #")[1].split(" ")[0]
                     print(f"🚴 ARDUINO MEGA - Jogador {player_idx + 1}: Pedalada #{pedal_num}")
                     
-                    # MARCAR JOGADOR COMO PRONTO (primeira pedalada)
+                    # Incrementar energia imediatamente na interrupção
+                    energy_key = f'player{player_idx + 1}_energy'
+                    if game_state[energy_key] < 100:
+                        game_state[energy_key] = min(100, game_state[energy_key] + 5)
+                        print(f"⚡ Jogador {player_idx + 1}: Energia incrementada para {game_state[energy_key]:.1f}%")
+                    
+                    # Marcar jogador como pronto (deu pelo menos uma pedalada)
                     if not game_state['players_ready'][player_idx]:
                         game_state['players_ready'][player_idx] = True
                         print(f"✅ Jogador {player_idx + 1}: PRIMEIRA PEDALADA - Marcado como PRONTO!")
@@ -372,12 +378,6 @@ class ArduinoMegaReader:
                         else:
                             ready_count = sum(game_state['players_ready'])
                             print(f"📊 Progresso: {ready_count}/4 jogadores prontos")
-                    
-                    # Incrementar energia imediatamente na interrupção
-                    energy_key = f'player{player_idx + 1}_energy'
-                    if game_state[energy_key] < 100:
-                        game_state[energy_key] = min(100, game_state[energy_key] + 5)
-                        print(f"⚡ Jogador {player_idx + 1}: Energia incrementada para {game_state[energy_key]:.1f}%")
                     
                     # Atualizar estado de pedalada
                     game_state['is_pedaling'][player_idx] = True
@@ -478,16 +478,15 @@ class BikeJJHTTPHandler(http.server.BaseHTTPRequestHandler):
             # Verificar se todos os jogadores estão prontos
             if not game_state['game_can_start']:
                 ready_count = sum(game_state['players_ready'])
-                print(f"❌ Jogo não pode ser iniciado. Apenas {ready_count}/4 jogadores estão prontos.")
+                response = {
+                    'success': False, 
+                    'message': f'Jogo não pode ser iniciado. Apenas {ready_count}/4 jogadores estão prontos.',
+                    'players_ready': game_state['players_ready'],
+                    'game_can_start': False
+                }
                 self.send_response(400)  # Bad Request
                 self.send_header('Content-Type', 'application/json')
                 self.end_headers()
-                response = {
-                    'success': False,
-                    'message': f'Jogo não pode ser iniciado. Apenas {ready_count}/4 jogadores estão prontos.',
-                    'players_ready': game_state['players_ready'],
-                    'ready_count': ready_count
-                }
                 self.wfile.write(json.dumps(response).encode())
                 return
             
@@ -501,26 +500,29 @@ class BikeJJHTTPHandler(http.server.BaseHTTPRequestHandler):
                 game_state['inactivity_count'][i] = 0
                 game_state['last_pedal_time'][i] = 0
                 game_state['inactivity_timer'][i] = 0
-                game_state['players_ready'][i] = False  # Resetar após iniciar
-            game_state['game_can_start'] = False  # Resetar após iniciar
+                game_state['players_ready'][i] = False # Resetar jogadores prontos
+                game_state['game_can_start'] = False # Resetar flag de início
             print("🎮 Jogo iniciado para 4 jogadores")
             self.send_response(200)
             self.end_headers()
-            self.wfile.write(json.dumps({'success': True, 'message': 'Jogo iniciado!'}).encode())
+            self.wfile.write(json.dumps({
+                'success': True, 
+                'message': 'Jogo iniciado com sucesso!'
+            }).encode())
             return
         elif self.path == '/api/reset-game':
-            # Resetar jogo
-            game_state['game_active'] = False
-            # Resetar energia de todos os jogadores
-            for i in range(4):
-                game_state[f'player{i+1}_energy'] = 0
-                game_state['pedal_count'][i] = 0
-                game_state['is_pedaling'][i] = False
-                game_state['inactivity_count'][i] = 0
-                game_state['last_pedal_time'][i] = 0
-                game_state['inactivity_timer'][i] = 0
-                game_state['players_ready'][i] = False  # Resetar jogadores prontos
-            game_state['game_can_start'] = False  # Resetar flag de início
+                         # Resetar jogo
+             game_state['game_active'] = False
+             # Resetar energia de todos os jogadores
+             for i in range(4):
+                 game_state[f'player{i+1}_energy'] = 0
+                 game_state['pedal_count'][i] = 0
+                 game_state['is_pedaling'][i] = False
+                 game_state['inactivity_count'][i] = 0
+                 game_state['last_pedal_time'][i] = 0
+                 game_state['inactivity_timer'][i] = 0
+                 game_state['players_ready'][i] = False # Resetar jogadores prontos
+                         game_state['game_can_start'] = False # Resetar flag de início
             print("🔄 Jogo resetado para 4 jogadores")
             self.send_response(200)
             self.end_headers()

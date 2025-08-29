@@ -45,16 +45,58 @@ class BikeJJGame {
         this.setupVirtualLeds(); // Configurar LEDs virtuais
         this.updateDisplay();
         
-            // Sistema de polling para comunicação em tempo real
-    this.setupPolling();
-    
-    // Controle de pedaladas do ESP32
-    this.esp32Connected = false;
-    this.lastPedalCount = 0;
-    this.lastPedalTime = 0;
-    this.decayTimer = null;
-    this.debugCounter = 0; // Contador para logs de debug
+        // Sistema de polling para comunicação em tempo real
+        this.setupPolling();
+        
+        // Controle de pedaladas do Arduino Mega
+        this.arduinoConnected = false;
+        this.lastPedalCount = 0;
+        this.lastPedalTime = 0;
+        this.decayTimer = null;
+        this.debugCounter = 0; // Contador para logs de debug
+        
+        // Sistema de controle offline
+        this.offlineMode = false;
+        this.connectionAttempts = 0;
+        this.maxConnectionAttempts = 5;
+        this.autoReconnect = true;
+        this.offlineTimer = null;
+        
+            // Verificar conexão inicial após um breve delay
+    setTimeout(() => {
+        this.checkInitialConnection();
+    }, 2000);
+}
+
+// Verificar conexão inicial
+async checkInitialConnection() {
+    try {
+        const response = await fetch('/api/state');
+        if (response.ok) {
+            console.log('✅ Conexão inicial com servidor estabelecida');
+            this.offlineMode = false;
+            this.updateConnectionStatus(true);
+            
+            // Verificar se há dados de energia já disponíveis
+            const gameState = await response.json();
+            console.log(`🔍 Dados iniciais do servidor: ${JSON.stringify(gameState)}`);
+            
+            // Se o servidor está funcionando, garantir que não estamos em modo offline
+            if (this.offlineMode) {
+                console.log('🔄 Servidor online detectado - Desativando modo offline');
+                this.offlineMode = false;
+                this.hideOfflineModal();
+                this.stopOfflineTimer();
+            }
+            
+        } else {
+            throw new Error('Servidor respondeu com erro');
+        }
+    } catch (error) {
+        console.log('❌ Servidor não disponível na inicialização:', error);
+        this.handleServerOffline();
     }
+}
     
     setupEventListeners() {
         // Controles do jogo
@@ -93,14 +135,50 @@ class BikeJJGame {
                 e.preventDefault();
             }
         });
+        
+        // Event listeners para modal offline
+        this.setupOfflineEventListeners();
+    }
+    
+    // Configurar event listeners para modal offline
+    setupOfflineEventListeners() {
+        // Botões do modal offline
+        const startOfflineBtn = document.getElementById('startOfflineBtn');
+        const reconnectBtn = document.getElementById('reconnectBtn');
+        const offlineConfigBtn = document.getElementById('offlineConfigBtn');
+        const closeOfflineModal = document.getElementById('closeOfflineModal');
+        const autoReconnectCheckbox = document.getElementById('autoReconnect');
+        
+        if (startOfflineBtn) {
+            startOfflineBtn.addEventListener('click', () => this.startOfflineGame());
+        }
+        
+        if (reconnectBtn) {
+            reconnectBtn.addEventListener('click', () => this.attemptReconnect());
+        }
+        
+        if (offlineConfigBtn) {
+            offlineConfigBtn.addEventListener('click', () => this.showConfigMenu());
+        }
+        
+        if (closeOfflineModal) {
+            closeOfflineModal.addEventListener('click', () => this.hideOfflineModal());
+        }
+        
+        if (autoReconnectCheckbox) {
+            autoReconnectCheckbox.addEventListener('change', (e) => {
+                this.autoReconnect = e.target.checked;
+                console.log(`🔄 Auto-reconexão: ${this.autoReconnect ? 'Ativada' : 'Desativada'}`);
+            });
+        }
     }
     
     // Configurar polling para verificar estado do jogo
     setupPolling() {
-        // Polling rápido para simular tempo real
+        // Polling simples e eficiente - 60 FPS
         setInterval(() => {
             this.checkGameState();
-        }, 50); // Verificar a cada 50ms (20 FPS)
+        }, 16); // 16ms = 60 FPS
     }
     
     async checkGameState() {
@@ -108,94 +186,259 @@ class BikeJJGame {
             const response = await fetch('/api/state');
             const gameState = await response.json();
             
-            // Atualizar energia do jogador 1
-            if (gameState.player1_energy !== this.players[0].energy) {
-                const oldEnergy = this.players[0].energy;
-                this.players[0].energy = gameState.player1_energy;
+            // Debug: log dos dados recebidos
+            if (this.debugCounter % 50 === 0) { // A cada 2.5 segundos
+                console.log(`📡 Dados recebidos do servidor:`, gameState);
+            }
+            
+            // Atualizar TODOS os jogadores
+            for (let i = 0; i < 4; i++) {
+                const player = this.players[i];
+                const energyKey = `player${i + 1}_energy`;
+                const oldEnergy = player.energy;
+                const newEnergy = gameState[energyKey] || 0;
                 
-                // Log da mudança de energia
-                if (gameState.player1_energy > oldEnergy) {
-                    console.log(`🚴 PEDALADA #${gameState.pedal_count} - Jogador 1: ${gameState.player1_energy}%`);
-                } else if (gameState.player1_energy < oldEnergy) {
-                    // Energia diminuiu - não resetar timer (decaimento natural)
-                    console.log(`📉 Energia diminuiu: ${oldEnergy}% → ${gameState.player1_energy}%`);
+                // Debug: log de todas as mudanças
+                if (newEnergy !== oldEnergy) {
+                    console.log(`🔄 Mudança detectada - Jogador ${i + 1}: ${oldEnergy}% → ${newEnergy}%`);
                 }
                 
-                // USAR O CAMPO is_pedaling DO SERVIDOR (mesma lógica das teclas QWER)
-                if (gameState.is_pedaling !== undefined) {
-                    this.players[0].isPedaling = gameState.is_pedaling;
-                    if (gameState.is_pedaling) {
-                        console.log('✅ Jogador 1 marcado como pedalando (ESP32)');
-                    } else {
-                        console.log('🛑 Jogador 1 parou de pedalar (ESP32 - Inatividade)');
+                // Debug: log de todos os valores
+                if (this.debugCounter % 100 === 0) {
+                    console.log(`🔍 Jogador ${i + 1}: oldEnergy=${oldEnergy}%, newEnergy=${newEnergy}%, key=${energyKey}`);
+                }
+                
+                // Atualizar energia se mudou
+                if (newEnergy !== oldEnergy) {
+                    player.energy = newEnergy;
+                    
+                    // Log da mudança de energia
+                    if (newEnergy > oldEnergy) {
+                        console.log(`🚴 PEDALADA - Jogador ${i + 1}: ${oldEnergy}% → ${newEnergy}%`);
+                    } else if (newEnergy < oldEnergy) {
+                        console.log(`📉 Decaimento - Jogador ${i + 1}: ${oldEnergy}% → ${newEnergy}%`);
                     }
+                }
+                
+                // Atualizar estado de pedalada
+                if (gameState.is_pedaling && gameState.is_pedaling[i] !== undefined) {
+                    player.isPedaling = gameState.is_pedaling[i];
                 }
                 
                 // Atualizar contador de pedaladas
-                this.updatePedalCount(gameState.pedal_count);
-                
-                // Atualizar status do ESP32
-                this.updateESP32Status(true);
-                
-                        // Atualizar display
-        this.updateDisplay();
-        
-        // RESETAR BARRAS VISUAIS APÓS ATUALIZAÇÃO
-        this.players.forEach(player => {
-            const playerBar = document.getElementById(`player${player.id}`);
-            if (playerBar) {
-                const energyFill = playerBar.querySelector('.energy-fill');
-                if (energyFill && player.energy === 0) {
-                    energyFill.style.width = '0%';
-                }
-            }
-        });
-        
-        // Verificar vitória
-                if (gameState.player1_energy >= 100 && this.gameState !== 'finished') {
-                    console.log('🏆 VITÓRIA! Jogador 1 chegou a 100% de energia!');
-                    console.log(`🔍 Debug: Energia=${gameState.player1_energy}, Estado=${this.gameState}`);
-                    this.declareWinner(1);
-                    return; // Parar processamento
-                } else if (gameState.player1_energy >= 100) {
-                    console.log(`⚠️ Energia 100% mas jogo já finalizado. Estado: ${this.gameState}`);
-                }
-                
-                // Verificar vitória de outros jogadores também
-                for (let i = 1; i < this.players.length; i++) {
-                    if (this.players[i].energy >= 100 && this.gameState !== 'finished') {
-                        console.log(`🏆 VITÓRIA! Jogador ${i + 1} chegou a 100% de energia!`);
-                        this.declareWinner(i + 1);
-                        return; // Parar processamento
-                    }
-                }
-                
-                // JOGO SEMPRE DISPONÍVEL - detectar quando jogo é iniciado automaticamente
-                if (gameState.game_active && this.gameState === 'waiting') {
-                    console.log('🎮 Jogo iniciado automaticamente com pedalada!');
-                    this.gameState = 'playing';
-                    this.showMessage('🎮 Jogo iniciado automaticamente! Pedale para ganhar!');
+                if (gameState.pedal_count && gameState.pedal_count[i] !== undefined) {
+                    player.pedalCount = gameState.pedal_count[i];
                 }
             }
             
-                                                    // Debug: mostrar estado atual a cada 5 segundos
-                if (this.debugCounter % 100 === 0) { // A cada 5 segundos (100 * 50ms)
-                    console.log(`🔍 Estado: Jogo=${this.gameState}, Energia=${this.players[0].energy}, Pedalando=${this.players[0].isPedaling}, Inatividade=${gameState.inactivity_count || 0} mensagens`);
-                    console.log(`🔍 Servidor: Energia=${gameState.player1_energy}, JogoAtivo=${gameState.game_active}`);
+            // Atualizar status do Arduino Mega
+            if (gameState.serial_connected) {
+                this.updateArduinoStatus(true);
+            }
+            
+            // Atualizar display
+            this.updateDisplay();
+            
+            // Verificar vitória de qualquer jogador
+            for (let i = 0; i < this.players.length; i++) {
+                if (this.players[i].energy >= 100 && this.gameState !== 'finished') {
+                    console.log(`🏆 VITÓRIA! Jogador ${i + 1} chegou a 100% de energia!`);
+                    this.declareWinner(i + 1);
+                    return;
                 }
-                this.debugCounter++;
-                
-                // 🚨 LOG DE INATIVIDADE (sem contador visual)
-                if (gameState.inactivity_count !== undefined && gameState.inactivity_count > 0) {
-                    console.log(`🚨 INATIVIDADE #${gameState.inactivity_count} mensagens - ESP32 enviou "Pedalada: False"`);
-                }
-                
-                // LÓGICA SIMPLES: O servidor já envia is_pedaling = true/false
-                // Não precisa de lógica complexa aqui
+            }
+            
+            // JOGO SEMPRE DISPONÍVEL - detectar quando jogo é iniciado automaticamente
+            if (gameState.game_active && this.gameState === 'waiting') {
+                console.log('🎮 Jogo iniciado automaticamente com pedalada!');
+                this.gameState = 'playing';
+                this.showMessage('🎮 Jogo iniciado automaticamente! Pedale para ganhar!');
+            }
+            
+            // Debug: mostrar estado atual a cada 5 segundos
+            if (this.debugCounter % 100 === 0) { // A cada 5 segundos (100 * 50ms)
+                console.log(`🔍 Estado: Jogo=${this.gameState}, Energias=[${this.players.map(p => p.energy).join(', ')}], Pedalando=[${this.players.map(p => p.isPedaling).join(', ')}]`);
+                console.log(`🔍 Servidor: Energias=[${gameState.player1_energy}, ${gameState.player2_energy}, ${gameState.player3_energy}, ${gameState.player4_energy}], JogoAtivo=${gameState.game_active}`);
+                console.log(`🔍 Jogadores Prontos: ${gameState.players_ready}, Pode Iniciar: ${gameState.game_can_start}`);
+                console.log(`🔍 Modo Offline: ${this.offlineMode}`);
+            }
+            this.debugCounter++;
             
         } catch (error) {
             console.log('❌ Erro no polling: ' + error);
+            
+            // Detectar se é erro de conexão (servidor offline)
+            if (error.name === 'TypeError' || 
+                error.message.includes('fetch') || 
+                error.message.includes('Failed to fetch') ||
+                error.message.includes('NetworkError')) {
+                this.handleServerOffline();
+            }
         }
+    }
+    
+    // Gerenciar servidor offline
+    handleServerOffline() {
+        if (!this.offlineMode) {
+            console.log('🔌 Servidor offline detectado - Ativando modo offline');
+            this.offlineMode = true;
+            this.showOfflineModal();
+            
+            // Iniciar timer para tentar reconectar
+            if (this.autoReconnect) {
+                this.startOfflineTimer();
+            }
+        } else {
+            console.log('🔌 Servidor offline - Já em modo offline');
+        }
+    }
+    
+    // Mostrar modal offline
+    showOfflineModal() {
+        const modal = document.getElementById('offlineModal');
+        if (modal) {
+            modal.classList.add('show');
+            console.log('🔌 Modal offline exibido');
+        }
+    }
+    
+    // Ocultar modal offline
+    hideOfflineModal() {
+        const modal = document.getElementById('offlineModal');
+        if (modal) {
+            modal.classList.remove('show');
+            console.log('🔌 Modal offline ocultado');
+        }
+    }
+    
+    // Iniciar jogo offline
+    startOfflineGame() {
+        console.log('🎮 Iniciando jogo offline');
+        this.hideOfflineModal();
+        
+        // Resetar estado do jogo para modo offline
+        this.resetGame();
+        this.gameState = 'playing';
+        
+        // Mostrar mensagem de modo offline
+        this.showMessage('🎮 Modo Offline Ativado - Use as teclas Q, W, E, R para jogar!');
+        
+        // Atualizar interface
+        this.updateDisplay();
+    }
+    
+    // Tentar reconectar ao servidor
+    async attemptReconnect() {
+        const reconnectStatus = document.getElementById('reconnectStatus');
+        const reconnectBtn = document.getElementById('reconnectBtn');
+        
+        if (reconnectStatus && reconnectBtn) {
+            reconnectStatus.textContent = 'Tentando reconectar...';
+            reconnectStatus.className = 'reconnect-status loading';
+            reconnectBtn.disabled = true;
+            reconnectBtn.textContent = 'Conectando...';
+        }
+        
+        try {
+            const response = await fetch('/api/state');
+            if (response.ok) {
+                console.log('✅ Servidor reconectado com sucesso!');
+                this.offlineMode = false;
+                this.connectionAttempts = 0;
+                
+                if (reconnectStatus) {
+                    reconnectStatus.textContent = '✅ Conectado!';
+                    reconnectStatus.className = 'reconnect-status success';
+                }
+                
+                if (reconnectBtn) {
+                    reconnectBtn.disabled = false;
+                    reconnectBtn.textContent = 'Tentar Reconectar';
+                }
+                
+                // Atualizar status de conexão
+                this.updateConnectionStatus(true);
+                
+                // Ocultar modal após 2 segundos
+                setTimeout(() => {
+                    this.hideOfflineModal();
+                }, 2000);
+                
+                // Reiniciar polling normal
+                this.restartNormalPolling();
+                
+            } else {
+                throw new Error('Servidor respondeu com erro');
+            }
+        } catch (error) {
+            console.log('❌ Falha na reconexão:', error);
+            this.connectionAttempts++;
+            
+            if (reconnectStatus) {
+                reconnectStatus.textContent = `❌ Falha na conexão (${this.connectionAttempts}/${this.maxConnectionAttempts})`;
+                reconnectStatus.className = 'reconnect-status error';
+            }
+            
+            if (reconnectBtn) {
+                reconnectBtn.disabled = false;
+                reconnectBtn.textContent = 'Tentar Novamente';
+            }
+            
+            // Se excedeu tentativas, desabilitar auto-reconexão
+            if (this.connectionAttempts >= this.maxConnectionAttempts) {
+                console.log('⚠️ Máximo de tentativas de reconexão atingido');
+                if (reconnectStatus) {
+                    reconnectStatus.textContent = '⚠️ Máximo de tentativas atingido. Verifique o servidor.';
+                }
+            }
+        }
+    }
+    
+    // Atualizar status de conexão no modal
+    updateConnectionStatus(isOnline) {
+        const statusIndicator = document.querySelector('.status-indicator');
+        const statusText = document.querySelector('.status-text');
+        
+        if (statusIndicator && statusText) {
+            if (isOnline) {
+                statusIndicator.className = 'status-indicator online';
+                statusText.textContent = 'Servidor Conectado';
+            } else {
+                statusIndicator.className = 'status-indicator offline';
+                statusText.textContent = 'Servidor Desconectado';
+            }
+        }
+    }
+    
+    // Iniciar timer para tentar reconectar automaticamente
+    startOfflineTimer() {
+        if (this.offlineTimer) {
+            clearInterval(this.offlineTimer);
+        }
+        
+        this.offlineTimer = setInterval(() => {
+            if (this.autoReconnect && this.connectionAttempts < this.maxConnectionAttempts) {
+                console.log('🔄 Tentativa automática de reconexão...');
+                this.attemptReconnect();
+            } else {
+                console.log('🛑 Auto-reconexão parada - Máximo de tentativas atingido');
+                this.stopOfflineTimer();
+            }
+        }, 10000); // Tentar a cada 10 segundos
+    }
+    
+    // Parar timer de reconexão
+    stopOfflineTimer() {
+        if (this.offlineTimer) {
+            clearInterval(this.offlineTimer);
+            this.offlineTimer = null;
+        }
+    }
+    
+    // Reiniciar polling normal após reconexão
+    restartNormalPolling() {
+        console.log('🔄 Reiniciando polling normal');
+        // O polling será retomado automaticamente na próxima iteração
     }
     
     // Processar mensagens WebSocket
@@ -295,7 +538,7 @@ class BikeJJGame {
     // Sistema de decaimento de energia (usando a mesma lógica das teclas QWER)
     // O decaimento é aplicado automaticamente no updateGame() quando isPedaling = false
     
-    // Verificar comandos externos da ESP32
+                    // Verificar comandos externos do Arduino Mega
     async checkExternalCommands() {
         try {
             const response = await fetch('/api/commands');
@@ -304,15 +547,15 @@ class BikeJJGame {
                 const commands = data.commands || [];
                 const gameState = data.game_state || {};
                 
-                // Atualizar estado do jogo do ESP32
+                // Atualizar estado do jogo do Arduino Mega
                 if (gameState.player1_energy !== undefined) {
                     this.players[0].energy = gameState.player1_energy;
                     this.updateEnergyBar(1, gameState.player1_energy);
                 }
                 
-                // Verificar se ESP32 está conectado
+                // Verificar se Arduino Mega está conectado
                 if (gameState.game_active !== undefined) {
-                    this.esp32Connected = gameState.game_active;
+                    this.arduinoConnected = gameState.game_active;
                 }
                 
                 // Processar comandos
@@ -327,13 +570,13 @@ class BikeJJGame {
         }
     }
     
-    // Processar comando externo da ESP32
+                    // Processar comando externo do Arduino Mega
     processExternalCommand(command) {
         // Processar comando externo
         
         switch (command.type) {
             case 'pedal_energy':
-                // Energia do ESP32 para jogador 1
+                // Energia do Arduino Mega para jogador 1
                 if (command.player_id === 1) {
                     const player = this.players[0];
                     const oldEnergy = player.energy;
@@ -341,7 +584,7 @@ class BikeJJGame {
                     // Atualizar energia
                     player.energy = command.energy;
                     
-                    // Marcar como pedalando quando receber energia do ESP32
+                    // Marcar como pedalando quando receber energia do Arduino Mega
                     player.isPedaling = true;
                     player.lastPedalTime = Date.now();
                     
@@ -359,7 +602,7 @@ class BikeJJGame {
                 break;
                 
             case 'winner':
-                // Vitória declarada pelo ESP32
+                // Vitória declarada pelo Arduino Mega
                 if (this.gameState !== 'finished') {
                     this.declareWinner(command.player_id);
                 }
@@ -376,7 +619,7 @@ class BikeJJGame {
                 break;
                 
             case 'stop_pedaling':
-                // ESP32 parou de pedalar
+                // Arduino Mega parou de pedalar
                 if (command.player_id === 1) {
                     const player = this.players[0];
                     player.isPedaling = false;
@@ -446,9 +689,9 @@ class BikeJJGame {
         }
     }
     
-    // Atualizar status do ESP32
-    updateESP32Status(connected) {
-        const statusElement = document.getElementById('esp32Status');
+    // Atualizar status do Arduino Mega
+    updateArduinoStatus(connected) {
+        const statusElement = document.getElementById('arduinoStatus');
         if (statusElement) {
             if (connected) {
                 statusElement.textContent = 'Conectado ✅';
@@ -460,13 +703,150 @@ class BikeJJGame {
         }
     }
     
-    // Atualizar barra de energia
+    // Atualizar barra de energia com animação GSAP orgânica
     updateEnergyBar(playerId, energy) {
-        const player = this.players.find(p => p.id === playerId);
-        if (player) {
-            player.energy = energy;
-            this.updateDisplay();
+        const energyBar = document.getElementById(`energy${playerId}`);
+        if (energyBar) {
+            // Converter energia para altura (0-100%)
+            const height = Math.min(100, Math.max(0, energy));
+            const currentHeight = parseFloat(energyBar.style.height) || 0;
+            
+            // Determinar se é ganho ou perda de energia
+            const isGaining = height > currentHeight;
+            const energyChange = Math.abs(height - currentHeight);
+            
+            // Configurar animação baseada no tipo de mudança
+            const animationConfig = {
+                height: `${height}%`,
+                duration: isGaining ? 1.5 : 2.0,
+                ease: isGaining ? "power2.out" : "power1.out",
+                onStart: () => {
+                    // Efeito de brilho durante animação
+                    energyBar.classList.add('charging');
+                    
+                    // Adicionar efeito de "pulse" suave para ganhos grandes
+                    if (isGaining && energyChange > 10) {
+                        gsap.to(energyBar, {
+                            scale: 1.02,
+                            duration: 0.4,
+                            ease: "power1.out",
+                            yoyo: true,
+                            repeat: 1
+                        });
+                    }
+                },
+                onUpdate: () => {
+                    // Efeito de ondulação durante animação
+                    if (isGaining) {
+                        this.addRippleEffect(energyBar);
+                    }
+                },
+                onComplete: () => {
+                    energyBar.classList.remove('charging');
+                    
+                    // Criar partículas de energia para ganhos
+                    if (isGaining && energyChange > 5) {
+                        this.createEnergyParticles(energyBar, height);
+                    }
+                    
+                    // Efeito de estabilização suave
+                    gsap.to(energyBar, {
+                        scale: 1,
+                        duration: 0.6,
+                        ease: "power1.out"
+                    });
+                }
+            };
+            
+            // Aplicar animação GSAP com easing suave
+            gsap.to(energyBar, {
+                ...animationConfig,
+                ease: isGaining ? "power2.out" : "power1.out",
+                // Adicionar suavização extra
+                smoothChildTiming: true,
+                overwrite: "auto"
+            });
         }
+    }
+    
+    // Adicionar efeito de ondulação
+    addRippleEffect(energyBar) {
+        const ripple = document.createElement('div');
+        ripple.className = 'energy-ripple';
+        ripple.style.cssText = `
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: radial-gradient(circle, rgba(255,255,255,0.3) 0%, transparent 70%);
+            border-radius: 12px;
+            pointer-events: none;
+            opacity: 0;
+        `;
+        
+        energyBar.appendChild(ripple);
+        
+        gsap.to(ripple, {
+            opacity: 1,
+            scale: 1.2,
+            duration: 0.3,
+            ease: "power2.out",
+            onComplete: () => {
+                ripple.remove();
+            }
+        });
+    }
+    
+    // Criar partículas de energia
+    createEnergyParticles(energyBar, height) {
+        const particleCount = Math.floor(height / 10); // Mais partículas para energia alta
+        const container = energyBar.querySelector('.energy-particles') || this.createParticleContainer(energyBar);
+        
+        for (let i = 0; i < particleCount; i++) {
+            setTimeout(() => {
+                this.createSingleParticle(container, energyBar);
+            }, i * 50); // Delay entre partículas
+        }
+    }
+    
+    // Criar container de partículas
+    createParticleContainer(energyBar) {
+        const container = document.createElement('div');
+        container.className = 'energy-particles';
+        energyBar.appendChild(container);
+        return container;
+    }
+    
+    // Criar partícula individual
+    createSingleParticle(container, energyBar) {
+        const particle = document.createElement('div');
+        particle.className = 'energy-particle';
+        
+        const rect = energyBar.getBoundingClientRect();
+        const startX = Math.random() * rect.width;
+        const startY = rect.height;
+        
+        particle.style.cssText = `
+            left: ${startX}px;
+            bottom: 0;
+            transform: translateY(0);
+        `;
+        
+        container.appendChild(particle);
+        
+        // Animação da partícula
+        gsap.to(particle, {
+            y: -rect.height * 2,
+            x: startX + (Math.random() - 0.5) * 50,
+            opacity: 0,
+            scale: 0,
+            duration: 1.5,
+            ease: "power2.out",
+            onComplete: () => {
+                particle.remove();
+            }
+        });
     }
     
     // Ativar LED do vencedor com strobe
@@ -576,7 +956,7 @@ class BikeJJGame {
         // Inicializar estado de pedalada
         this.players[0].isPedaling = false;
         this.players[0].lastPedalTime = Date.now();
-        console.log('✅ Sistema de pedalada ESP32 inicializado');
+        console.log('✅ Sistema de pedalada Arduino Mega inicializado');
         
         document.getElementById('startBtn').disabled = true;
         document.getElementById('startBtn').textContent = 'Jogo em Andamento';
@@ -667,16 +1047,12 @@ class BikeJJGame {
         const now = Date.now();
         
         this.players.forEach(player => {
-            
-            
             // Decaimento natural da energia (por segundo, não por frame)
             if (!player.isPedaling) {
                 const oldEnergy = player.energy;
                 // Aplicar decaimento por segundo, não por frame
                 const decayPerFrame = this.energyDecayRate / 60; // Converter para por frame
                 player.energy = Math.max(0, player.energy - decayPerFrame);
-                
-                
             }
             
             // Atualizar pontuação baseada na energia constante
@@ -684,13 +1060,11 @@ class BikeJJGame {
                 player.score += 0.05; // Reduzido o bônus de consistência
             }
             
-                    // Verificar se algum jogador atingiu energia máxima (vitória instantânea)
-        if (player.energy >= this.maxEnergy) {
-            this.endGameWithWinner(player);
-            return;
-        }
-            
-
+            // Verificar se algum jogador atingiu energia máxima (vitória instantânea)
+            if (player.energy >= this.maxEnergy) {
+                this.endGameWithWinner(player);
+                return;
+            }
         });
         
         // Atualizar relatório em tempo real
@@ -703,8 +1077,18 @@ class BikeJJGame {
             // Atualizar barra de energia (cresce de baixo para cima)
             const energyFill = document.getElementById(`energy${player.id}`);
             const energyPercentage = (player.energy / this.maxEnergy) * 100;
-            energyFill.style.height = `${energyPercentage}%`;
-            energyFill.style.bottom = '0'; // Garantir que cresça de baixo
+            
+            if (energyFill) {
+                energyFill.style.height = `${energyPercentage}%`;
+                energyFill.style.bottom = '0'; // Garantir que cresça de baixo
+                
+                // Debug: log das mudanças de energia
+                if (player.energy > 0) {
+                    console.log(`📊 Jogador ${player.id}: Energia = ${player.energy}% (${energyPercentage}% da barra)`);
+                }
+            } else {
+                console.error(`❌ Elemento energy${player.id} não encontrado!`);
+            }
             
             // Atualizar pontuação
             const scoreElement = document.querySelector(`#player${player.id} .player-score`);
@@ -734,6 +1118,54 @@ class BikeJJGame {
             // Atualizar estados dos segmentos de cores
             this.updateEnergySegments(player.id, player.energy);
         });
+        
+        // Atualizar status de conexão na interface
+        this.updateConnectionStatusDisplay();
+    }
+    
+    // Atualizar status de conexão na interface principal
+    updateConnectionStatusDisplay() {
+        // Adicionar indicador de status na interface principal
+        let statusIndicator = document.getElementById('connectionStatusIndicator');
+        
+        if (!statusIndicator) {
+            // Criar indicador se não existir
+            const gameControls = document.querySelector('.game-controls');
+            if (gameControls) {
+                statusIndicator = document.createElement('div');
+                statusIndicator.id = 'connectionStatusIndicator';
+                statusIndicator.className = 'connection-status-main';
+                gameControls.appendChild(statusIndicator);
+            }
+        }
+        
+        if (statusIndicator) {
+            if (this.offlineMode) {
+                statusIndicator.innerHTML = `
+                    <div class="status-main offline">
+                        <span class="status-dot offline"></span>
+                        <span class="status-text">Modo Offline</span>
+                        <button class="btn btn-small" id="offlineControlsBtn">🔧 Controles</button>
+                    </div>
+                `;
+                
+                // Adicionar event listener para o botão de controles
+                const controlsBtn = statusIndicator.querySelector('#offlineControlsBtn');
+                if (controlsBtn) {
+                    controlsBtn.addEventListener('click', () => this.showOfflineModal());
+                }
+            } else {
+                statusIndicator.innerHTML = `
+                    <div class="status-main online">
+                        <span class="status-dot online"></span>
+                        <span class="status-text">Servidor Conectado</span>
+                    </div>
+                `;
+            }
+        }
+        
+        // Debug: log do status de conexão
+        console.log(`🔌 Status de conexão atualizado: offlineMode=${this.offlineMode}`);
     }
     
     updateEnergySegments(playerId, energy) {
@@ -1499,7 +1931,7 @@ class BikeJJGame {
             
             // Desabilitar controles de teclado
             if (player.id === 1) {
-                // Jogador 1 (ESP32) - parar decaimento
+                // Jogador 1 (Arduino Mega) - parar decaimento
                 this.stopEnergyDecay();
             }
             
@@ -1739,7 +2171,7 @@ class BikeJJGame {
         // 2. RESETAR ESTADO INTERNO COMPLETAMENTE
         this.gameState = 'waiting';
         this.gameTime = 0;
-        this.esp32Connected = false;
+        this.arduinoConnected = false;
         this.lastPedalCount = 0;
         this.lastPedalTime = 0;
         this.debugCounter = 0;
@@ -1932,15 +2364,17 @@ class BikeJJGame {
             }
         });
         
-        // Verificar barras visuais
+        // Verificação simplificada das barras visuais
         for (let i = 1; i <= 4; i++) {
             const playerBar = document.getElementById(`player${i}`);
             if (playerBar) {
                 const energyFill = playerBar.querySelector('.energy-fill');
                 if (energyFill) {
+                    // Verificar se a barra está próxima de 0% (tolerância de 5px)
                     const computedWidth = window.getComputedStyle(energyFill).width;
-                    if (computedWidth !== '0px') {
-                        console.log(`⚠️ Barra do Jogador ${i} não está em 0%: ${computedWidth}`);
+                    const widthValue = parseFloat(computedWidth);
+                    if (widthValue > 5) {
+                        console.log(`⚠️ Barra do Jogador ${i} não está próxima de 0%: ${computedWidth}`);
                         allGood = false;
                     }
                 }
@@ -1958,10 +2392,8 @@ class BikeJJGame {
             this.showMessage('Jogo resetado completamente!');
         } else {
             console.log('❌ VERIFICAÇÃO COMPLETA: ALGUNS ELEMENTOS NÃO FORAM RESETADOS!');
-            // Tentar reset novamente
-            setTimeout(() => {
-                this.completeReset();
-            }, 500);
+            // Não tentar reset novamente para evitar loop infinito
+            this.showMessage('Reset parcial - alguns elementos podem precisar de refresh da página');
         }
     }
     

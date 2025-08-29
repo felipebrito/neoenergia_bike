@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>BikeJJ - Competição de Energia</title>
     <link rel="stylesheet" href="styles.css">
+    <!-- GSAP para animações suaves -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
 </head>
 <body>
     <div class="container">
@@ -171,6 +173,66 @@
             <div class="led" id="led2" data-player="2"></div>
             <div class="led" id="led3" data-player="3"></div>
             <div class="led" id="led4" data-player="4"></div>
+        </div>
+    </div>
+
+    <!-- Modal de Controle Offline -->
+    <div class="offline-modal" id="offlineModal">
+        <div class="offline-content">
+            <div class="offline-header">
+                <h2>🔌 Modo Offline</h2>
+                <div class="connection-status">
+                    <span class="status-indicator offline"></span>
+                    <span class="status-text">Servidor Desconectado</span>
+                </div>
+            </div>
+            
+            <div class="offline-body">
+                <p>O servidor não está disponível. Você pode:</p>
+                
+                <div class="offline-options">
+                    <div class="option-group">
+                        <h3>🎮 Jogar Offline</h3>
+                        <p>Use as teclas Q, W, E, R para controlar os jogadores</p>
+                        <button id="startOfflineBtn" class="btn btn-primary">Iniciar Jogo Offline</button>
+                    </div>
+                    
+                    <div class="option-group">
+                        <h3>🔧 Tentar Reconectar</h3>
+                        <p>Verificar se o servidor voltou</p>
+                        <button id="reconnectBtn" class="btn btn-secondary">Tentar Reconectar</button>
+                        <div class="reconnect-status" id="reconnectStatus"></div>
+                    </div>
+                    
+                    <div class="option-group">
+                        <h3>⚙️ Configurações Offline</h3>
+                        <p>Ajustar parâmetros do jogo</p>
+                        <button id="offlineConfigBtn" class="btn btn-config">Configurações</button>
+                    </div>
+                </div>
+                
+                <div class="offline-info">
+                    <h4>ℹ️ Informações:</h4>
+                    <ul>
+                        <li>✅ Jogo totalmente funcional offline</li>
+                        <li>✅ Todas as animações e efeitos</li>
+                        <li>✅ Sistema de pontuação completo</li>
+                        <li>✅ Configurações personalizáveis</li>
+                        <li>⚠️ Sem integração com Arduino</li>
+                        <li>⚠️ Dados não sincronizam com servidor</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="offline-footer">
+                <button id="closeOfflineModal" class="btn btn-secondary">Fechar</button>
+                <div class="auto-reconnect">
+                    <label>
+                        <input type="checkbox" id="autoReconnect" checked>
+                        Tentar reconectar automaticamente
+                    </label>
+                </div>
+            </div>
         </div>
     </div>
 
