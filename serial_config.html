@@ -349,14 +349,28 @@
             }
 
             portsList.innerHTML = ports.map(port => {
-                const portDevice = port.device || port;
+                // Garantir que temos a string da porta
+                let portDevice;
+                if (typeof port === 'string') {
+                    portDevice = port;
+                } else if (port && port.device) {
+                    portDevice = port.device;
+                } else if (port && typeof port === 'object') {
+                    portDevice = port.name || port.path || Object.values(port)[0];
+                } else {
+                    console.error('❌ Formato de porta desconhecido:', port);
+                    return '';
+                }
+                
+                console.log('🔍 Processando porta:', portDevice, 'do objeto:', port);
+                
                 return `
                 <div class="port-item ${portDevice === currentPort ? 'selected' : ''}" 
                      onclick="selectPort('${portDevice}')" 
                      data-port="${portDevice}">
                     <div class="port-name">${portDevice}</div>
-                    <div class="port-description">${port.description || 'N/A'}</div>
-                    <div class="port-manufacturer">${port.manufacturer || 'N/A'}</div>
+                    <div class="port-description">${(port && port.description) || 'N/A'}</div>
+                    <div class="port-manufacturer">${(port && port.manufacturer) || 'N/A'}</div>
                 </div>
                 `;
             }).join('');
