@@ -751,6 +751,7 @@ class BikeJJHTTPHandler(http.server.BaseHTTPRequestHandler):
                 self.end_headers()
                 response = {'success': False, 'message': 'Erro interno'}
                 self.wfile.write(json.dumps(response).encode())
+            return
                 
         elif self.path == '/api/serial/change-port':
             # Alterar porta serial
