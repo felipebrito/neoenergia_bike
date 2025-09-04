@@ -754,21 +754,33 @@ class BikeJJHTTPHandler(http.server.BaseHTTPRequestHandler):
                 
         elif self.path == '/api/serial/change-port':
             # Alterar porta serial
-            content_length = int(self.headers['Content-Length'])
-            post_data = self.rfile.read(content_length)
-            data = json.loads(post_data.decode('utf-8'))
-            
-            new_port = data.get('port')
-            if new_port:
-                success = change_serial_port(new_port)
-                response = {'success': success, 'port': new_port}
-            else:
-                response = {'success': False, 'error': 'Porta não especificada'}
-            
-            self.send_response(200)
-            self.send_header('Content-Type', 'application/json')
-            self.end_headers()
-            self.wfile.write(json.dumps(response).encode())
+            try:
+                content_length = int(self.headers['Content-Length'])
+                post_data = self.rfile.read(content_length)
+                data = json.loads(post_data.decode('utf-8'))
+                
+                new_port = data.get('port')
+                print(f"🔧 Recebido pedido para alterar porta para: {new_port}")
+                
+                if new_port:
+                    success = change_serial_port(new_port)
+                    print(f"🔧 Resultado da alteração de porta: {success}")
+                    response = {'success': success, 'port': new_port, 'message': f'Porta configurada para {new_port}'}
+                else:
+                    print("❌ Porta não especificada na requisição")
+                    response = {'success': False, 'error': 'Porta não especificada'}
+                
+                self.send_response(200)
+                self.send_header('Content-Type', 'application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps(response).encode())
+            except Exception as e:
+                print(f"❌ Erro ao processar mudança de porta: {e}")
+                self.send_response(500)
+                self.send_header('Content-Type', 'application/json')
+                self.end_headers()
+                response = {'success': False, 'error': f'Erro interno: {str(e)}'}
+                self.wfile.write(json.dumps(response).encode())
             
         elif self.path == '/api/config/save':
             # Salvar configurações do jogo

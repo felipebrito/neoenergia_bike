@@ -382,6 +382,9 @@
 
             // Habilitar botão de conexão
             document.getElementById('connectBtn').disabled = false;
+            
+            // Mostrar mensagem de confirmação
+            showMessage(`✅ Porta selecionada: ${port}. Clique em "Conectar" para continuar.`, 'info');
         }
 
         // Conectar à porta selecionada
@@ -390,6 +393,9 @@
                 showMessage('⚠️ Selecione uma porta primeiro', 'error');
                 return;
             }
+
+            console.log('Tentando conectar à porta:', selectedPort);
+            showMessage(`🔄 Conectando à porta ${selectedPort}...`, 'info');
 
             try {
                 // Primeiro, configurar a porta no servidor
