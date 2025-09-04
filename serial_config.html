@@ -348,14 +348,18 @@
                 return;
             }
 
-            portsList.innerHTML = ports.map(port => `
-                <div class="port-item ${port.device === currentPort ? 'selected' : ''}" 
-                     onclick="selectPort('${port.device}')">
-                    <div class="port-name">${port.device}</div>
+            portsList.innerHTML = ports.map(port => {
+                const portDevice = port.device || port;
+                return `
+                <div class="port-item ${portDevice === currentPort ? 'selected' : ''}" 
+                     onclick="selectPort('${portDevice}')" 
+                     data-port="${portDevice}">
+                    <div class="port-name">${portDevice}</div>
                     <div class="port-description">${port.description || 'N/A'}</div>
                     <div class="port-manufacturer">${port.manufacturer || 'N/A'}</div>
                 </div>
-            `).join('');
+                `;
+            }).join('');
 
             // Selecionar porta atual se existir
             if (currentPort) {
@@ -365,23 +369,44 @@
 
         // Selecionar uma porta
         function selectPort(port) {
+            console.log('🔍 selectPort chamada com:', port, 'tipo:', typeof port);
+            
+            if (!port || port === 'undefined' || port === 'null') {
+                console.error('❌ Porta inválida recebida:', port);
+                showMessage('❌ Erro: Porta inválida', 'error');
+                return;
+            }
+            
             selectedPort = port;
-            console.log('Porta selecionada:', port);
+            console.log('✅ Porta selecionada:', selectedPort);
             
             // Atualizar seleção visual
             document.querySelectorAll('.port-item').forEach(item => {
                 item.classList.remove('selected');
             });
             
-            const selectedItem = Array.from(document.querySelectorAll('.port-item'))
-                .find(item => item.querySelector('.port-name').textContent === port);
+            // Usar data-port ao invés de textContent para maior confiabilidade
+            const selectedItem = document.querySelector(`[data-port="${port}"]`);
             
             if (selectedItem) {
                 selectedItem.classList.add('selected');
+                console.log('✅ Item visual selecionado para porta:', port);
+            } else {
+                console.warn('⚠️ Item não encontrado para porta:', port);
+                // Fallback para método antigo
+                const fallbackItem = Array.from(document.querySelectorAll('.port-item'))
+                    .find(item => item.querySelector('.port-name').textContent === port);
+                if (fallbackItem) {
+                    fallbackItem.classList.add('selected');
+                    console.log('✅ Item encontrado via fallback');
+                }
             }
 
             // Habilitar botão de conexão
-            document.getElementById('connectBtn').disabled = false;
+            const connectBtn = document.getElementById('connectBtn');
+            if (connectBtn) {
+                connectBtn.disabled = false;
+            }
             
             // Mostrar mensagem de confirmação
             showMessage(`✅ Porta selecionada: ${port}. Clique em "Conectar" para continuar.`, 'info');
