@@ -43,12 +43,31 @@ def load_serial_config():
             with open(CONFIG_FILE, 'r') as f:
                 config = json.load(f)
                 loaded_port = config.get('serial_port')
-                # Verificar se a porta carregada é válida
-                if loaded_port and is_valid_serial_port(loaded_port):
-                    SERIAL_PORT = loaded_port
-                    print(f"📁 Configuração carregada: {SERIAL_PORT}")
+                # ⚠️ VERIFICAR COMPATIBILIDADE COM O SISTEMA OPERACIONAL
+                if loaded_port:
+                    # Detectar se estamos no Windows vs Mac/Linux
+                    is_windows = os.name == 'nt'
+                    is_mac_linux_port = loaded_port.startswith('/dev/')
+                    is_windows_port = loaded_port.startswith('COM')
+                    
+                    # Se estamos no Windows mas temos porta Mac/Linux, ignorar
+                    if is_windows and is_mac_linux_port:
+                        print(f"⚠️ Porta Mac/Linux detectada no Windows, ignorando: {loaded_port}")
+                        print("🔧 Use http://localhost:9000/serial_config.html para configurar uma porta COM")
+                        SERIAL_PORT = None
+                    # Se estamos no Mac/Linux mas temos porta Windows, ignorar
+                    elif not is_windows and is_windows_port:
+                        print(f"⚠️ Porta Windows detectada no Mac/Linux, ignorando: {loaded_port}")
+                        print("🔧 Use http://localhost:9000/serial_config.html para configurar uma porta /dev/")
+                        SERIAL_PORT = None
+                    # Verificar se a porta é válida para o sistema atual
+                    elif is_valid_serial_port(loaded_port):
+                        SERIAL_PORT = loaded_port
+                        print(f"📁 Configuração carregada: {SERIAL_PORT}")
+                    else:
+                        print(f"⚠️ Porta configurada inválida: {loaded_port}")
+                        SERIAL_PORT = None
                 else:
-                    print(f"⚠️ Porta configurada inválida: {loaded_port}")
                     SERIAL_PORT = None
         else:
             # NÃO detectar automaticamente - deixar usuário configurar
@@ -597,6 +616,31 @@ class BikeJJHTTPHandler(http.server.BaseHTTPRequestHandler):
                 'baudrate': SERIAL_BAUDRATE
             }
             self.wfile.write(json.dumps(status).encode())
+            return
+        elif self.path == '/api/serial/connect':
+            # Conectar à porta serial selecionada no frontend
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.end_headers()
+            
+            # O frontend deveria enviar a porta selecionada, mas por agora vamos usar a última configurada
+            if SERIAL_PORT:
+                try:
+                    # Tentar conectar
+                    if arduino_reader:
+                        success = arduino_reader.start()
+                        if success:
+                            response = {'success': True, 'message': f'Conectado à porta {SERIAL_PORT}'}
+                        else:
+                            response = {'success': False, 'message': f'Falha ao conectar à porta {SERIAL_PORT}'}
+                    else:
+                        response = {'success': False, 'message': 'Arduino reader não inicializado'}
+                except Exception as e:
+                    response = {'success': False, 'message': f'Erro ao conectar: {str(e)}'}
+            else:
+                response = {'success': False, 'message': 'Nenhuma porta configurada. Selecione uma porta primeiro.'}
+            
+            self.wfile.write(json.dumps(response).encode())
             return
         
         elif self.path == '/api/config':

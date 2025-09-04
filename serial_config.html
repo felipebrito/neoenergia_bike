@@ -392,18 +392,37 @@
             }
 
             try {
-                const response = await fetch('/api/serial/connect', {
+                // Primeiro, configurar a porta no servidor
+                const configResponse = await fetch('/api/serial/change-port', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        port: selectedPort
+                    })
+                });
+
+                const configResult = await configResponse.json();
+                
+                if (!configResult.success) {
+                    showMessage(`❌ Erro ao configurar porta: ${configResult.message || 'Erro desconhecido'}`, 'error');
+                    return;
+                }
+
+                // Depois, tentar conectar
+                const connectResponse = await fetch('/api/serial/connect', {
                     method: 'GET'
                 });
 
-                const result = await response.json();
+                const connectResult = await connectResponse.json();
                 
-                if (result.success) {
+                if (connectResult.success) {
                     showMessage(`✅ Conectado à porta ${selectedPort}`, 'success');
                     refreshStatus();
                     refreshPorts();
                 } else {
-                    showMessage(`❌ Erro ao conectar: ${result.message || 'Erro desconhecido'}`, 'error');
+                    showMessage(`❌ Erro ao conectar: ${connectResult.message || 'Erro desconhecido'}`, 'error');
                 }
             } catch (error) {
                 console.error('Erro ao conectar:', error);
