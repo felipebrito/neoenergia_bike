@@ -35,6 +35,9 @@ class BikeJJGame {
             currentWinner: null
         };
         
+        // Controle de requisições para evitar sobrecarga
+        this.isPolling = false;
+        
         this.init();
     }
     
@@ -175,13 +178,20 @@ async checkInitialConnection() {
     
     // Configurar polling para verificar estado do jogo
     setupPolling() {
-        // Polling simples e eficiente - 60 FPS
+        // Polling otimizado - 10 FPS (suficiente para o jogo)
         setInterval(() => {
             this.checkGameState();
-        }, 16); // 16ms = 60 FPS
+        }, 100); // 100ms = 10 FPS
     }
     
     async checkGameState() {
+        // Evitar requisições simultâneas
+        if (this.isPolling) {
+            return;
+        }
+        
+        this.isPolling = true;
+        
         try {
             const response = await fetch('/api/state');
             const gameState = await response.json();
@@ -274,6 +284,9 @@ async checkInitialConnection() {
                 error.message.includes('NetworkError')) {
                 this.handleServerOffline();
             }
+        } finally {
+            // Sempre resetar o flag de polling
+            this.isPolling = false;
         }
     }
     
