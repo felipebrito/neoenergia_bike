@@ -813,6 +813,33 @@ class BikeJJHTTPHandler(http.server.BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(json.dumps(response).encode())
             
+        elif self.path == '/api/udp':
+            # Endpoint para dados UDP (vitória, reset, etc.)
+            try:
+                content_length = int(self.headers['Content-Length'])
+                post_data = self.rfile.read(content_length)
+                data = json.loads(post_data.decode('utf-8'))
+                
+                print(f"📡 UDP Data recebido: {data['type']} - Jogador {data['player_id']}")
+                
+                # Aqui você pode adicionar lógica para enviar dados UDP para TouchDesigner
+                # Por enquanto, apenas logamos os dados
+                if data['type'] == 'winner':
+                    print(f"🏆 Vencedor detectado: Jogador {data['player_id']}")
+                elif data['type'] == 'reset':
+                    print("🔄 Reset do jogo detectado")
+                
+                response = {'success': True, 'message': 'Dados UDP processados'}
+                
+            except Exception as e:
+                response = {'success': False, 'message': f'Erro ao processar dados UDP: {str(e)}'}
+                print(f"❌ Erro ao processar dados UDP: {e}")
+            
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.end_headers()
+            self.wfile.write(json.dumps(response).encode())
+            
         else:
             self.send_response(404)
             self.end_headers()
