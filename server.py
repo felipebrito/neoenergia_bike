@@ -243,6 +243,13 @@ def apply_energy_decay():
             
             print(f"🔍 Jogador {player_idx + 1}: Energia={current_energy:.1f}%, Pedalando={is_pedaling}")
             
+            # Resetar is_pedaling se passou muito tempo desde a última pedalada (modo teclado)
+            last_pedal_time = game_state['last_pedal_time'][player_idx]
+            if last_pedal_time > 0 and current_time - last_pedal_time > 2.0:  # 2s sem pedalada
+                game_state['is_pedaling'][player_idx] = False
+                is_pedaling = False
+                print(f"🔄 Jogador {player_idx + 1}: Resetando estado de pedalada (tempo: {current_time - last_pedal_time:.1f}s)")
+            
             # Aplicar decaimento apenas se o jogador não estiver pedalando
             if not is_pedaling and current_energy > 0:
                 # Calcular decaimento para o intervalo usando configuração
@@ -646,7 +653,62 @@ class BikeJJHTTPHandler(http.server.BaseHTTPRequestHandler):
             self.wfile.write(f"Internal server error: {str(e)}".encode())
     
     def do_POST(self):
-        if self.path == '/api/serial/change-port':
+        if self.path == '/api/pedal':
+            # Endpoint para simular pedaladas via teclado
+            try:
+                content_length = int(self.headers['Content-Length'])
+                post_data = self.rfile.read(content_length)
+                data = json.loads(post_data.decode('utf-8'))
+                
+                player_id = data.get('player', 1)
+                if 1 <= player_id <= 4:
+                    player_idx = player_id - 1
+                    energy_key = f'player{player_id}_energy'
+                    
+                    # Incrementar energia usando configuração
+                    energy_gain = game_config['energy_gain_rate']
+                    game_state[energy_key] = min(100, game_state[energy_key] + energy_gain)
+                    game_state['is_pedaling'][player_idx] = True
+                    game_state['last_pedal_time'][player_idx] = time.time()
+                    game_state['pedal_count'][player_idx] += 1
+                    
+                    print(f"⌨️ TECLADO - Jogador {player_id}: Energia = {game_state[energy_key]:.1f}% (+{energy_gain}%)")
+                    
+                    # Verificar vitória
+                    if game_state[energy_key] >= 100:
+                        print(f"🏆 VITÓRIA! Jogador {player_id} chegou a 100% de energia!")
+                        game_state['game_active'] = False
+                        
+                        # Resetar energia de todos os jogadores
+                        for i in range(4):
+                            game_state[f'player{i+1}_energy'] = 0
+                            game_state['pedal_count'][i] = 0
+                            game_state['is_pedaling'][i] = False
+                            game_state['last_pedal_time'][i] = 0
+                            game_state['players_ready'][i] = False
+                        game_state['game_can_start'] = False
+                        print("🔄 Jogo resetado após vitória!")
+                    
+                    self.send_response(200)
+                    self.send_header('Content-Type', 'application/json')
+                    self.end_headers()
+                    response = {'success': True, 'energy': game_state[energy_key]}
+                    self.wfile.write(json.dumps(response).encode())
+                else:
+                    self.send_response(400)
+                    self.send_header('Content-Type', 'application/json')
+                    self.end_headers()
+                    response = {'success': False, 'message': 'Player ID inválido'}
+                    self.wfile.write(json.dumps(response).encode())
+            except Exception as e:
+                print(f"❌ Erro ao processar pedalada: {e}")
+                self.send_response(500)
+                self.send_header('Content-Type', 'application/json')
+                self.end_headers()
+                response = {'success': False, 'message': 'Erro interno'}
+                self.wfile.write(json.dumps(response).encode())
+                
+        elif self.path == '/api/serial/change-port':
             # Alterar porta serial
             content_length = int(self.headers['Content-Length'])
             post_data = self.rfile.read(content_length)

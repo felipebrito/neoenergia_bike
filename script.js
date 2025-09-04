@@ -1001,22 +1001,35 @@ async checkInitialConnection() {
         player.lastPedalTime = now;
         player.isPedaling = true;
         
-        // Aumentar energia
-        const oldEnergy = player.energy;
-        player.energy = Math.min(this.maxEnergy, player.energy + this.energyGainRate);
-        
-                // Verificar se atingiu energia máxima
-        if (player.energy >= this.maxEnergy) {
-            this.endGameWithWinner(player);
-            return;
-        }
-        
-        // Adicionar pontuação baseada na energia atual
-        const energyBonus = Math.floor(player.energy / 20);
-        player.score += 0.5 + energyBonus;
+        // Enviar pedalada para o servidor
+        this.sendPedalToServer(playerId);
         
         // Atualizar display
         this.updateDisplay();
+    }
+    
+    // Enviar pedalada para o servidor
+    async sendPedalToServer(playerId) {
+        try {
+            const response = await fetch('/api/pedal', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    player: playerId
+                })
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                console.log(`⌨️ Pedalada enviada para servidor: Jogador ${playerId}, Energia: ${data.energy}%`);
+            } else {
+                console.log(`❌ Erro ao enviar pedalada: ${response.status}`);
+            }
+        } catch (error) {
+            console.log(`❌ Erro de conexão ao enviar pedalada: ${error}`);
+        }
     }
     
     recordPedalEvent(playerId, energy) {
