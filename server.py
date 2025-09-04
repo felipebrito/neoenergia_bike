@@ -22,6 +22,19 @@ SERIAL_BAUDRATE = 115200
 SERIAL_PORT = None
 CONFIG_FILE = 'serial_config.json'
 
+# Configurações de sensibilidade (serão carregadas de arquivo)
+GAME_CONFIG_FILE = 'game_config.json'
+DEFAULT_ENERGY_GAIN = 1.5  # 1.5% por pedalada (mais realista)
+DEFAULT_ENERGY_DECAY = 2.5  # 2.5% por segundo
+DEFAULT_LED_STROBE = 200  # 200ms
+
+# Configurações atuais do jogo
+game_config = {
+    'energy_gain_rate': DEFAULT_ENERGY_GAIN,
+    'energy_decay_rate': DEFAULT_ENERGY_DECAY,
+    'led_strobe_rate': DEFAULT_LED_STROBE
+}
+
 def load_serial_config():
     """Carregar configuração da porta serial do arquivo"""
     global SERIAL_PORT
@@ -45,6 +58,33 @@ def load_serial_config():
     except Exception as e:
         print(f"❌ Erro ao carregar configuração: {e}")
         SERIAL_PORT = None
+
+def load_game_config():
+    """Carregar configurações do jogo do arquivo"""
+    global game_config
+    try:
+        if os.path.exists(GAME_CONFIG_FILE):
+            with open(GAME_CONFIG_FILE, 'r') as f:
+                config = json.load(f)
+                game_config['energy_gain_rate'] = config.get('energy_gain_rate', DEFAULT_ENERGY_GAIN)
+                game_config['energy_decay_rate'] = config.get('energy_decay_rate', DEFAULT_ENERGY_DECAY)
+                game_config['led_strobe_rate'] = config.get('led_strobe_rate', DEFAULT_LED_STROBE)
+                print(f"⚙️ Configurações do jogo carregadas: Ganho={game_config['energy_gain_rate']}%, Decaimento={game_config['energy_decay_rate']}%/s")
+        else:
+            print("💡 Usando configurações padrão do jogo")
+            save_game_config()  # Salvar configurações padrão
+    except Exception as e:
+        print(f"❌ Erro ao carregar configurações do jogo: {e}")
+        print("💡 Usando configurações padrão")
+
+def save_game_config():
+    """Salvar configurações do jogo no arquivo"""
+    try:
+        with open(GAME_CONFIG_FILE, 'w') as f:
+            json.dump(game_config, f, indent=2)
+        print(f"💾 Configurações do jogo salvas: {game_config}")
+    except Exception as e:
+        print(f"❌ Erro ao salvar configurações do jogo: {e}")
 
 def is_valid_serial_port(port):
     """Verificar se uma porta serial é válida para Arduino Mega"""
@@ -184,7 +224,6 @@ game_state = {
 # Timer para decaimento de energia (funciona independentemente do jogo)
 last_decay_time = time.time()
 DECAY_INTERVAL = 0.5  # Verificar decaimento a cada 0.5 segundos
-DECAY_RATE = 2.5      # Taxa de decaimento por segundo
 
 def apply_energy_decay():
     """Aplicar decaimento de energia para todos os jogadores"""
@@ -195,7 +234,7 @@ def apply_energy_decay():
     if current_time - last_decay_time >= DECAY_INTERVAL:
         last_decay_time = current_time
         
-        print(f"⏰ Aplicando decaimento de energia... (Taxa: {DECAY_RATE}%/s)")
+        print(f"⏰ Aplicando decaimento de energia... (Taxa: {game_config['energy_decay_rate']}%/s)")
         
         for player_idx in range(4):
             energy_key = f'player{player_idx + 1}_energy'
@@ -206,8 +245,8 @@ def apply_energy_decay():
             
             # Aplicar decaimento apenas se o jogador não estiver pedalando
             if not is_pedaling and current_energy > 0:
-                # Calcular decaimento para o intervalo
-                decay_amount = DECAY_RATE * DECAY_INTERVAL
+                # Calcular decaimento para o intervalo usando configuração
+                decay_amount = game_config['energy_decay_rate'] * DECAY_INTERVAL
                 new_energy = max(0, current_energy - decay_amount)
                 game_state[energy_key] = new_energy
                 
@@ -373,11 +412,12 @@ class ArduinoMegaReader:
                             ready_count = sum(game_state['players_ready'])
                             print(f"📊 Progresso: {ready_count}/4 jogadores prontos")
                     
-                    # Incrementar energia imediatamente na interrupção
+                    # Incrementar energia imediatamente na interrupção usando configuração
                     energy_key = f'player{player_idx + 1}_energy'
                     if game_state[energy_key] < 100:
-                        game_state[energy_key] = min(100, game_state[energy_key] + 5)
-                        print(f"⚡ Jogador {player_idx + 1}: Energia incrementada para {game_state[energy_key]:.1f}%")
+                        energy_gain = game_config['energy_gain_rate']
+                        game_state[energy_key] = min(100, game_state[energy_key] + energy_gain)
+                        print(f"⚡ Jogador {player_idx + 1}: Energia incrementada para {game_state[energy_key]:.1f}% (+{energy_gain}%)")
                     
                     # Atualizar estado de pedalada
                     game_state['is_pedaling'][player_idx] = True
@@ -552,6 +592,14 @@ class BikeJJHTTPHandler(http.server.BaseHTTPRequestHandler):
             self.wfile.write(json.dumps(status).encode())
             return
         
+        elif self.path == '/api/config':
+            # Retornar configurações atuais do jogo
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.end_headers()
+            self.wfile.write(json.dumps(game_config).encode())
+            return
+        
         # Servir arquivos estáticos
         try:
             # Mapear rotas para arquivos
@@ -615,6 +663,37 @@ class BikeJJHTTPHandler(http.server.BaseHTTPRequestHandler):
             self.send_header('Content-Type', 'application/json')
             self.end_headers()
             self.wfile.write(json.dumps(response).encode())
+            
+        elif self.path == '/api/config/save':
+            # Salvar configurações do jogo
+            content_length = int(self.headers['Content-Length'])
+            post_data = self.rfile.read(content_length)
+            data = json.loads(post_data.decode('utf-8'))
+            
+            try:
+                # Validar e atualizar configurações
+                if 'energy_gain_rate' in data:
+                    game_config['energy_gain_rate'] = max(0.1, min(10.0, float(data['energy_gain_rate'])))
+                if 'energy_decay_rate' in data:
+                    game_config['energy_decay_rate'] = max(0.1, min(20.0, float(data['energy_decay_rate'])))
+                if 'led_strobe_rate' in data:
+                    game_config['led_strobe_rate'] = max(50, min(2000, int(data['led_strobe_rate'])))
+                
+                # Salvar no arquivo
+                save_game_config()
+                
+                response = {'success': True, 'message': 'Configurações salvas com sucesso!', 'config': game_config}
+                print(f"⚙️ Configurações atualizadas: {game_config}")
+                
+            except Exception as e:
+                response = {'success': False, 'message': f'Erro ao salvar configurações: {str(e)}'}
+                print(f"❌ Erro ao salvar configurações: {e}")
+            
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.end_headers()
+            self.wfile.write(json.dumps(response).encode())
+            
         else:
             self.send_response(404)
             self.end_headers()
@@ -622,8 +701,9 @@ class BikeJJHTTPHandler(http.server.BaseHTTPRequestHandler):
 def main():
     print("🚀 Iniciando servidor BikeJJ...")
     
-    # Carregar configuração da porta serial (mas não conectar automaticamente)
+    # Carregar configurações
     load_serial_config()
+    load_game_config()
     
     # NÃO iniciar leitor Arduino Mega automaticamente
     # Deixar o usuário configurar via interface

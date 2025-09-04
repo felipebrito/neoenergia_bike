@@ -4,14 +4,14 @@ class BikeJJGame {
         this.gameTime = 0;
         this.gameTimer = null;
         
-        // Configurações padrão
+        // Configurações padrão (mais realistas)
         this.defaultConfig = {
-            energyDecayRate: 15.0,  // 15% por segundo (mais agressivo)
-            energyGainRate: 5.0,    // 5% por pedalada (mais rápido)
+            energyDecayRate: 2.5,   // 2.5% por segundo (mais realista)
+            energyGainRate: 1.5,    // 1.5% por pedalada (mais realista)
             ledStrobeRate: 200
         };
         
-        // Carregar configurações salvas ou usar padrões
+        // Carregar configurações salvas ou usar padrões (será carregado de forma assíncrona)
         this.loadConfig();
         
         this.maxEnergy = 100; // Fixo em 100%
@@ -1792,7 +1792,7 @@ async checkInitialConnection() {
         document.getElementById('ledStrobeValue').textContent = this.ledStrobeRate + 'ms';
     }
     
-    applyConfig() {
+    async applyConfig() {
         // Aplicar novas configurações
         this.energyGainRate = parseFloat(document.getElementById('energyGainRate').value);
         this.energyDecayRate = parseFloat(document.getElementById('energyDecayRate').value);
@@ -1801,11 +1801,35 @@ async checkInitialConnection() {
         // Atualizar taxa de strobe dos LEDs
         this.updateStrobeRate();
         
-        // Salvar configurações automaticamente
-        this.saveConfig();
+        // Salvar configurações no servidor
+        try {
+            const response = await fetch('/api/config/save', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    energy_gain_rate: this.energyGainRate,
+                    energy_decay_rate: this.energyDecayRate,
+                    led_strobe_rate: this.ledStrobeRate
+                })
+            });
+            
+            if (response.ok) {
+                const result = await response.json();
+                console.log('✅ Configurações salvas no servidor:', result);
+                this.showMessage('✅ Configurações aplicadas e salvas no servidor!');
+            } else {
+                throw new Error('Erro ao salvar no servidor');
+            }
+        } catch (error) {
+            console.log('⚠️ Erro ao salvar no servidor, salvando localmente:', error);
+            // Fallback para salvar localmente
+            this.saveConfig();
+            this.showMessage('⚠️ Configurações salvas localmente (servidor offline)');
+        }
         
         this.hideConfigMenu();
-        this.showMessage('Configurações aplicadas e salvas!');
         
         // Atualizar display se o jogo estiver rodando
         if (this.gameState === 'playing') {
@@ -1844,7 +1868,23 @@ async checkInitialConnection() {
         }
     }
     
-    loadConfig() {
+    async loadConfig() {
+        try {
+            // Primeiro tentar carregar do servidor
+            const response = await fetch('/api/config');
+            if (response.ok) {
+                const serverConfig = await response.json();
+                this.energyGainRate = serverConfig.energy_gain_rate || this.defaultConfig.energyGainRate;
+                this.energyDecayRate = serverConfig.energy_decay_rate || this.defaultConfig.energyDecayRate;
+                this.ledStrobeRate = serverConfig.led_strobe_rate || this.defaultConfig.ledStrobeRate;
+                console.log('⚙️ Configurações carregadas do servidor:', serverConfig);
+                return;
+            }
+        } catch (error) {
+            console.log('⚠️ Servidor não disponível, carregando configurações locais');
+        }
+        
+        // Fallback para configurações locais
         try {
             const savedConfig = localStorage.getItem('bikejj_config');
             if (savedConfig) {
