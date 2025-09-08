@@ -37,6 +37,29 @@ game_config = {
     'led_strobe_rate': DEFAULT_LED_STROBE
 }
 
+def test_arduino_connection(port, timeout=3):
+    """Testar conexão com Arduino"""
+    try:
+        ser = serial.Serial(port, SERIAL_BAUDRATE, timeout=timeout)
+        time.sleep(2)  # Aguardar inicialização
+        
+        # Tentar ler dados do Arduino
+        data_received = False
+        start_time = time.time()
+        
+        while time.time() - start_time < timeout:
+            if ser.in_waiting > 0:
+                line = ser.readline().decode('utf-8', errors='ignore').strip()
+                if line and ('🔍' in line or '📊' in line or '📈' in line):
+                    data_received = True
+                    break
+            time.sleep(0.1)
+        
+        ser.close()
+        return data_received
+    except Exception as e:
+        return False
+
 def load_serial_config():
     """Carregar configuração da porta serial do arquivo"""
     global SERIAL_PORT
@@ -64,8 +87,14 @@ def load_serial_config():
                         SERIAL_PORT = None
                     # Verificar se a porta é válida para o sistema atual
                     elif is_valid_serial_port(loaded_port):
-                        SERIAL_PORT = loaded_port
-                        print(f"📁 Configuração carregada: {SERIAL_PORT}")
+                        # Testar conexão com Arduino
+                        print(f"🔌 Testando conexão com Arduino em {loaded_port}...")
+                        if test_arduino_connection(loaded_port):
+                            SERIAL_PORT = loaded_port
+                            print(f"✅ Arduino conectado e funcionando em {SERIAL_PORT}")
+                        else:
+                            print(f"❌ Arduino não responde em {loaded_port}")
+                            SERIAL_PORT = None
                     else:
                         print(f"⚠️ Porta configurada inválida: {loaded_port}")
                         SERIAL_PORT = None
