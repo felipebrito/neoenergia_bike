@@ -702,6 +702,36 @@ header p {
     color: #cccccc;
 }
 
+.config-presets {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+    flex-wrap: wrap;
+}
+
+.preset-btn {
+    background: rgba(52, 152, 219, 0.2);
+    border: 1px solid rgba(52, 152, 219, 0.5);
+    color: #3498db;
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-weight: 500;
+}
+
+.preset-btn:hover {
+    background: rgba(52, 152, 219, 0.4);
+    border-color: #3498db;
+    transform: translateY(-1px);
+}
+
+.preset-btn:active {
+    transform: translateY(0);
+    background: rgba(52, 152, 219, 0.6);
+}
+
 .config-group input[type="range"] {
     width: 100%;
     margin-bottom: 5px;

@@ -26,8 +26,8 @@ CONFIG_FILE = 'serial_config.json'
 
 # Configurações de sensibilidade (serão carregadas de arquivo)
 GAME_CONFIG_FILE = 'game_config.json'
-DEFAULT_ENERGY_GAIN = 1.5  # 1.5% por pedalada (mais realista)
-DEFAULT_ENERGY_DECAY = 2.5  # 2.5% por segundo
+DEFAULT_ENERGY_GAIN = 2.0  # 2.0% por pedalada (mais responsivo)
+DEFAULT_ENERGY_DECAY = 5.0  # 5.0% por segundo (decaimento mais instantâneo)
 DEFAULT_LED_STROBE = 200  # 200ms
 
 # Configurações atuais do jogo
@@ -92,9 +92,9 @@ def load_game_config():
                 game_config['energy_decay_rate'] = float(config.get('energy_decay_rate', DEFAULT_ENERGY_DECAY))
                 game_config['led_strobe_rate'] = int(config.get('led_strobe_rate', DEFAULT_LED_STROBE))
                 
-                # Validar valores
-                game_config['energy_gain_rate'] = max(0.1, min(10.0, game_config['energy_gain_rate']))
-                game_config['energy_decay_rate'] = max(0.1, min(20.0, game_config['energy_decay_rate']))
+                # Validar valores com range maior para sensibilidade
+                game_config['energy_gain_rate'] = max(0.1, min(50.0, game_config['energy_gain_rate']))
+                game_config['energy_decay_rate'] = max(0.1, min(100.0, game_config['energy_decay_rate']))
                 game_config['led_strobe_rate'] = max(50, min(2000, game_config['led_strobe_rate']))
                 
                 print(f"⚙️ Configurações do jogo carregadas:")
@@ -893,15 +893,15 @@ class BikeJJHTTPHandler(http.server.BaseHTTPRequestHandler):
             try:
                 print(f"🔧 Recebendo configurações para salvar: {data}")
                 
-                # Validar e atualizar configurações
+                # Validar e atualizar configurações com range maior para sensibilidade
                 if 'energy_gain_rate' in data:
                     old_value = game_config['energy_gain_rate']
-                    game_config['energy_gain_rate'] = max(0.1, min(10.0, float(data['energy_gain_rate'])))
+                    game_config['energy_gain_rate'] = max(0.1, min(50.0, float(data['energy_gain_rate'])))
                     print(f"📈 Ganho de energia: {old_value}% → {game_config['energy_gain_rate']}%")
                     
                 if 'energy_decay_rate' in data:
                     old_value = game_config['energy_decay_rate']
-                    game_config['energy_decay_rate'] = max(0.1, min(20.0, float(data['energy_decay_rate'])))
+                    game_config['energy_decay_rate'] = max(0.1, min(100.0, float(data['energy_decay_rate'])))
                     print(f"📉 Decaimento: {old_value}%/s → {game_config['energy_decay_rate']}%/s")
                     
                 if 'led_strobe_rate' in data:

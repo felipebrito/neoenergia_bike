@@ -4,15 +4,15 @@ class BikeJJGame {
         this.gameTime = 0;
         this.gameTimer = null;
         
-        // Configurações padrão (mais realistas)
+        // Configurações padrão (mais responsivas)
         this.defaultConfig = {
-            energyDecayRate: 2.5,   // 2.5% por segundo (mais realista)
-            energyGainRate: 1.5,    // 1.5% por pedalada (mais realista)
+            energyDecayRate: 5.0,   // 5.0% por segundo (decaimento mais instantâneo)
+            energyGainRate: 2.0,    // 2.0% por pedalada (mais responsivo)
             ledStrobeRate: 200
         };
         
-        // Carregar configurações salvas ou usar padrões (será carregado de forma assíncrona)
-        this.loadConfig();
+        // Carregar configurações salvas ou usar padrões
+        this.loadConfigSync();
         
         this.maxEnergy = 100; // Fixo em 100%
         
@@ -108,7 +108,10 @@ async checkInitialConnection() {
         document.getElementById('newGameBtn').addEventListener('click', () => this.newGame());
         
         // Menu de configurações
-        document.getElementById('configBtn').addEventListener('click', () => this.showConfigMenu());
+        document.getElementById('configBtn').addEventListener('click', () => {
+            console.log('🔧 Botão de configuração clicado!');
+            this.showConfigMenu();
+        });
         document.getElementById('closeConfig').addEventListener('click', () => this.hideConfigMenu());
         document.getElementById('applyConfig').addEventListener('click', () => this.applyConfig());
         document.getElementById('resetConfig').addEventListener('click', () => this.resetConfig());
@@ -1764,11 +1767,18 @@ async checkInitialConnection() {
     
     // Métodos do menu de configurações
     showConfigMenu() {
-        document.getElementById('configMenu').classList.add('show');
-        this.updateConfigDisplay();
-        
-        // Mostrar status das configurações
-        this.updateConfigStatus();
+        console.log('🔧 Abrindo menu de configurações...');
+        const configMenu = document.getElementById('configMenu');
+        if (configMenu) {
+            configMenu.classList.add('show');
+            this.updateConfigDisplay();
+            
+            // Mostrar status das configurações
+            this.updateConfigStatus();
+            console.log('✅ Menu de configurações aberto');
+        } else {
+            console.error('❌ Elemento configMenu não encontrado!');
+        }
     }
     
     hideConfigMenu() {
@@ -1816,6 +1826,37 @@ async checkInitialConnection() {
         
         document.getElementById('ledStrobeRate').value = this.ledStrobeRate;
         document.getElementById('ledStrobeValue').textContent = this.ledStrobeRate + 'ms';
+        
+        // Configurar botões de preset
+        this.setupPresetButtons();
+    }
+    
+    setupPresetButtons() {
+        // Botões de preset para ganho de energia
+        const energyGainElement = document.getElementById('energyGainRate');
+        if (energyGainElement && energyGainElement.parentNode) {
+            const gainPresets = energyGainElement.parentNode.querySelectorAll('.preset-btn');
+            gainPresets.forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const value = parseFloat(e.target.dataset.value);
+                    document.getElementById('energyGainRate').value = value;
+                    document.getElementById('energyGainValue').textContent = value + '%';
+                });
+            });
+        }
+        
+        // Botões de preset para decaimento
+        const energyDecayElement = document.getElementById('energyDecayRate');
+        if (energyDecayElement && energyDecayElement.parentNode) {
+            const decayPresets = energyDecayElement.parentNode.querySelectorAll('.preset-btn');
+            decayPresets.forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const value = parseFloat(e.target.dataset.value);
+                    document.getElementById('energyDecayRate').value = value;
+                    document.getElementById('energyDecayValue').textContent = value + '%';
+                });
+            });
+        }
     }
     
     async applyConfig() {
@@ -1894,23 +1935,8 @@ async checkInitialConnection() {
         }
     }
     
-    async loadConfig() {
-        try {
-            // Primeiro tentar carregar do servidor
-            const response = await fetch('/api/config');
-            if (response.ok) {
-                const serverConfig = await response.json();
-                this.energyGainRate = serverConfig.energy_gain_rate || this.defaultConfig.energyGainRate;
-                this.energyDecayRate = serverConfig.energy_decay_rate || this.defaultConfig.energyDecayRate;
-                this.ledStrobeRate = serverConfig.led_strobe_rate || this.defaultConfig.ledStrobeRate;
-                console.log('⚙️ Configurações carregadas do servidor:', serverConfig);
-                return;
-            }
-        } catch (error) {
-            console.log('⚠️ Servidor não disponível, carregando configurações locais');
-        }
-        
-        // Fallback para configurações locais
+    loadConfigSync() {
+        // Carregar configurações locais primeiro (síncrono)
         try {
             const savedConfig = localStorage.getItem('bikejj_config');
             if (savedConfig) {
@@ -1921,15 +1947,43 @@ async checkInitialConnection() {
                     this.energyGainRate = config.energyGainRate;
                     this.energyDecayRate = config.energyDecayRate;
                     this.ledStrobeRate = config.ledStrobeRate || this.defaultConfig.ledStrobeRate;
-                } else {
-                    this.useDefaultConfig();
+                    console.log('⚙️ Configurações carregadas do localStorage:', config);
+                    return;
                 }
-            } else {
-                this.useDefaultConfig();
             }
         } catch (error) {
-            this.useDefaultConfig();
+            console.log('⚠️ Erro ao carregar configurações locais:', error);
         }
+        
+        // Usar configurações padrão se não houver configurações salvas
+        this.useDefaultConfig();
+        
+        // Tentar carregar do servidor em background (assíncrono)
+        this.loadConfigFromServer();
+    }
+    
+    async loadConfigFromServer() {
+        try {
+            // Tentar carregar do servidor
+            const response = await fetch('/api/config');
+            if (response.ok) {
+                const serverConfig = await response.json();
+                this.energyGainRate = serverConfig.config.energy_gain_rate || this.defaultConfig.energyGainRate;
+                this.energyDecayRate = serverConfig.config.energy_decay_rate || this.defaultConfig.energyDecayRate;
+                this.ledStrobeRate = serverConfig.config.led_strobe_rate || this.defaultConfig.ledStrobeRate;
+                console.log('⚙️ Configurações atualizadas do servidor:', serverConfig);
+                
+                // Salvar no localStorage para próxima vez
+                this.saveConfig();
+            }
+        } catch (error) {
+            console.log('⚠️ Servidor não disponível para configurações');
+        }
+    }
+    
+    async loadConfig() {
+        // Manter função assíncrona para compatibilidade
+        return this.loadConfigFromServer();
     }
     
     useDefaultConfig() {
