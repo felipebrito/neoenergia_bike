@@ -13,10 +13,12 @@ import socketserver
 import json
 import os
 import platform
+import socket
 
 # Configurações
 HTTP_PORT = 9000
 SERIAL_BAUDRATE = 115200
+UDP_PORT = 8888
 
 # Configuração da porta serial (será carregada de arquivo ou definida via interface)
 SERIAL_PORT = None
@@ -83,27 +85,48 @@ def load_game_config():
     global game_config
     try:
         if os.path.exists(GAME_CONFIG_FILE):
-            with open(GAME_CONFIG_FILE, 'r') as f:
+            with open(GAME_CONFIG_FILE, 'r', encoding='utf-8') as f:
                 config = json.load(f)
-                game_config['energy_gain_rate'] = config.get('energy_gain_rate', DEFAULT_ENERGY_GAIN)
-                game_config['energy_decay_rate'] = config.get('energy_decay_rate', DEFAULT_ENERGY_DECAY)
-                game_config['led_strobe_rate'] = config.get('led_strobe_rate', DEFAULT_LED_STROBE)
-                print(f"⚙️ Configurações do jogo carregadas: Ganho={game_config['energy_gain_rate']}%, Decaimento={game_config['energy_decay_rate']}%/s")
+                # Carregar com validação
+                game_config['energy_gain_rate'] = float(config.get('energy_gain_rate', DEFAULT_ENERGY_GAIN))
+                game_config['energy_decay_rate'] = float(config.get('energy_decay_rate', DEFAULT_ENERGY_DECAY))
+                game_config['led_strobe_rate'] = int(config.get('led_strobe_rate', DEFAULT_LED_STROBE))
+                
+                # Validar valores
+                game_config['energy_gain_rate'] = max(0.1, min(10.0, game_config['energy_gain_rate']))
+                game_config['energy_decay_rate'] = max(0.1, min(20.0, game_config['energy_decay_rate']))
+                game_config['led_strobe_rate'] = max(50, min(2000, game_config['led_strobe_rate']))
+                
+                print(f"⚙️ Configurações do jogo carregadas:")
+                print(f"   📈 Ganho de energia: {game_config['energy_gain_rate']}% por pedalada")
+                print(f"   📉 Decaimento: {game_config['energy_decay_rate']}% por segundo")
+                print(f"   💡 LED strobe: {game_config['led_strobe_rate']}ms")
         else:
-            print("💡 Usando configurações padrão do jogo")
+            print("💡 Arquivo de configuração não encontrado, criando com valores padrão")
             save_game_config()  # Salvar configurações padrão
     except Exception as e:
         print(f"❌ Erro ao carregar configurações do jogo: {e}")
         print("💡 Usando configurações padrão")
+        # Garantir que as configurações padrão estejam definidas
+        game_config = {
+            'energy_gain_rate': DEFAULT_ENERGY_GAIN,
+            'energy_decay_rate': DEFAULT_ENERGY_DECAY,
+            'led_strobe_rate': DEFAULT_LED_STROBE
+        }
 
 def save_game_config():
     """Salvar configurações do jogo no arquivo"""
     try:
-        with open(GAME_CONFIG_FILE, 'w') as f:
-            json.dump(game_config, f, indent=2)
-        print(f"💾 Configurações do jogo salvas: {game_config}")
+        with open(GAME_CONFIG_FILE, 'w', encoding='utf-8') as f:
+            json.dump(game_config, f, indent=2, ensure_ascii=False)
+        print(f"💾 Configurações do jogo salvas:")
+        print(f"   📈 Ganho de energia: {game_config['energy_gain_rate']}% por pedalada")
+        print(f"   📉 Decaimento: {game_config['energy_decay_rate']}% por segundo")
+        print(f"   💡 LED strobe: {game_config['led_strobe_rate']}ms")
+        return True
     except Exception as e:
         print(f"❌ Erro ao salvar configurações do jogo: {e}")
+        return False
 
 def is_valid_serial_port(port):
     """Verificar se uma porta serial é válida para Arduino Mega"""
@@ -350,11 +373,13 @@ class ArduinoMegaReader:
     def _read_serial(self):
         while self.running:
             try:
+                # OTIMIZAÇÃO: Processar múltiplas linhas de uma vez
                 if self.serial_conn and self.serial_conn.in_waiting:
-                    line = self.serial_conn.readline().decode('utf-8', errors='ignore').strip()
-                    if line:
-                        self._process_line(line)
-                time.sleep(0.01)
+                    while self.serial_conn.in_waiting > 0:
+                        line = self.serial_conn.readline().decode('utf-8', errors='ignore').strip()
+                        if line:
+                            self._process_line(line)
+                time.sleep(0.001)  # Reduzido de 10ms para 1ms
             except Exception as e:
                 print(f"❌ Erro na leitura serial: {e}")
                 time.sleep(1)
@@ -365,39 +390,44 @@ class ArduinoMegaReader:
         
         print(f"📨 Arduino: {line}")  # Debug: mostrar todas as mensagens
         
-        # CAPTURAR PEDALADAS POR JOGADOR (Arduino Mega)
-        if "Jogador" in line and "Pedalada:" in line:
+        # CAPTURAR PEDALADAS POR JOGADOR (Arduino Mega) - FORMATO OTIMIZADO
+        if "🔍 J" in line and ":" in line:
             try:
-                # Extrair número do jogador (1-4)
-                if "Jogador 1:" in line:
+                # Extrair número do jogador do formato otimizado "🔍 J1:5"
+                if "J1:" in line:
                     player_idx = 0
-                elif "Jogador 2:" in line:
+                elif "J2:" in line:
                     player_idx = 1
-                elif "Jogador 3:" in line:
+                elif "J3:" in line:
                     player_idx = 2
-                elif "Jogador 4:" in line:
+                elif "J4:" in line:
                     player_idx = 3
                 else:
                     print(f"⚠️ Jogador não reconhecido na mensagem: {line}")
                     return
                 
-                print(f"🎯 Processando mensagem para Jogador {player_idx + 1}")
+                print(f"🎯 Processando pedalada para Jogador {player_idx + 1}")
                 
-                # Processar estado da pedalada
-                if "Pedalada: True" in line:
-                    game_state['is_pedaling'][player_idx] = True
-                    game_state['inactivity_count'][player_idx] = 0
-                    game_state['last_pedal_time'][player_idx] = current_time
-                    print(f"✅ ARDUINO MEGA - Jogador {player_idx + 1}: Pedalando")
-                    
-                elif "Pedalada: False" in line:
-                    game_state['is_pedaling'][player_idx] = False
-                    game_state['inactivity_count'][player_idx] += 1
-                    print(f"🛑 ARDUINO MEGA - Jogador {player_idx + 1}: Parou de pedalar (Inatividade #{game_state['inactivity_count'][player_idx]})")
+                # Extrair número da pedalada do formato "🔍 J1:5"
+                pedal_num = line.split(":")[1].strip()
                 
-                # Debug: mostrar estado atual do jogador
+                # Processar pedalada completa
+                game_state['is_pedaling'][player_idx] = True
+                game_state['inactivity_count'][player_idx] = 0
+                game_state['last_pedal_time'][player_idx] = current_time
+                game_state['pedal_count'][player_idx] = int(pedal_num)
+                
+                # Incrementar energia usando configuração
                 energy_key = f'player{player_idx + 1}_energy'
-                print(f"📊 Jogador {player_idx + 1}: Energia={game_state[energy_key]:.1f}%, Pedalando={game_state['is_pedaling'][player_idx]}")
+                energy_gain = game_config['energy_gain_rate']
+                game_state[energy_key] = min(100, game_state[energy_key] + energy_gain)
+                
+                print(f"✅ ARDUINO MEGA - Jogador {player_idx + 1}: Pedalada #{pedal_num} - Energia = {game_state[energy_key]:.1f}% (+{energy_gain}%)")
+                
+                # Verificar se ganhou
+                if game_state[energy_key] >= 100:
+                    print(f"🏆 VITÓRIA! Jogador {player_idx + 1} atingiu 100% de energia!")
+                    send_udp_message('winner', player_idx + 1)
             
             except Exception as e:
                 print(f"❌ Erro ao processar mensagem do jogador: {e}")
@@ -516,6 +546,41 @@ class ArduinoMegaReader:
 # Instância global do leitor Arduino Mega
 arduino_reader = ArduinoMegaReader()
 
+# Servidor UDP para enviar mensagens para o aparato
+udp_socket = None
+
+def init_udp_socket():
+    """Inicializar socket UDP para envio de mensagens"""
+    global udp_socket
+    try:
+        udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        print(f"📡 Socket UDP inicializado para porta {UDP_PORT}")
+    except Exception as e:
+        print(f"❌ Erro ao inicializar UDP: {e}")
+
+def send_udp_message(message_type, player_id=0):
+    """Enviar mensagem UDP para o aparato"""
+    global udp_socket
+    if not udp_socket:
+        return
+    
+    try:
+        message = {
+            "type": message_type,
+            "player_id": player_id,
+            "timestamp": time.time()
+        }
+        
+        json_data = json.dumps(message)
+        data = json_data.encode('utf-8')
+        
+        # Enviar para localhost:8888 (aparato)
+        udp_socket.sendto(data, ('127.0.0.1', UDP_PORT))
+        print(f"📤 UDP enviado: {message_type} - Jogador {player_id}")
+        
+    except Exception as e:
+        print(f"❌ Erro ao enviar UDP: {e}")
+
 class BikeJJHTTPHandler(http.server.BaseHTTPRequestHandler):
     def end_headers(self):
         # Adicionar CORS headers
@@ -587,6 +652,10 @@ class BikeJJHTTPHandler(http.server.BaseHTTPRequestHandler):
                 game_state['inactivity_timer'][i] = 0
                 game_state['players_ready'][i] = False  # Resetar jogadores prontos
             game_state['game_can_start'] = False  # Resetar flag de início
+            
+            # Enviar mensagem de reset via UDP
+            send_udp_message('reset', 0)
+            
             print("🔄 Jogo resetado para 4 jogadores")
             self.send_response(200)
             self.end_headers()
@@ -648,7 +717,36 @@ class BikeJJHTTPHandler(http.server.BaseHTTPRequestHandler):
             self.send_response(200)
             self.send_header('Content-Type', 'application/json')
             self.end_headers()
-            self.wfile.write(json.dumps(game_config).encode())
+            response = {
+                'config': game_config,
+                'file_exists': os.path.exists(GAME_CONFIG_FILE),
+                'file_path': GAME_CONFIG_FILE
+            }
+            self.wfile.write(json.dumps(response).encode())
+            return
+        
+        elif self.path == '/api/config/reload':
+            # Recarregar configurações do arquivo
+            try:
+                load_game_config()
+                response = {
+                    'success': True, 
+                    'message': 'Configurações recarregadas do arquivo', 
+                    'config': game_config
+                }
+                print(f"🔄 Configurações recarregadas do arquivo {GAME_CONFIG_FILE}")
+            except Exception as e:
+                response = {
+                    'success': False, 
+                    'message': f'Erro ao recarregar: {str(e)}', 
+                    'config': game_config
+                }
+                print(f"❌ Erro ao recarregar configurações: {e}")
+            
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.end_headers()
+            self.wfile.write(json.dumps(response).encode())
             return
         
         # Servir arquivos estáticos
@@ -723,6 +821,9 @@ class BikeJJHTTPHandler(http.server.BaseHTTPRequestHandler):
                         print(f"🏆 VITÓRIA! Jogador {player_id} chegou a 100% de energia!")
                         game_state['game_active'] = False
                         
+                        # Enviar mensagem de vitória via UDP
+                        send_udp_message('winner', player_id)
+                        
                         # Resetar energia de todos os jogadores
                         for i in range(4):
                             game_state[f'player{i+1}_energy'] = 0
@@ -790,23 +891,43 @@ class BikeJJHTTPHandler(http.server.BaseHTTPRequestHandler):
             data = json.loads(post_data.decode('utf-8'))
             
             try:
+                print(f"🔧 Recebendo configurações para salvar: {data}")
+                
                 # Validar e atualizar configurações
                 if 'energy_gain_rate' in data:
+                    old_value = game_config['energy_gain_rate']
                     game_config['energy_gain_rate'] = max(0.1, min(10.0, float(data['energy_gain_rate'])))
+                    print(f"📈 Ganho de energia: {old_value}% → {game_config['energy_gain_rate']}%")
+                    
                 if 'energy_decay_rate' in data:
+                    old_value = game_config['energy_decay_rate']
                     game_config['energy_decay_rate'] = max(0.1, min(20.0, float(data['energy_decay_rate'])))
+                    print(f"📉 Decaimento: {old_value}%/s → {game_config['energy_decay_rate']}%/s")
+                    
                 if 'led_strobe_rate' in data:
+                    old_value = game_config['led_strobe_rate']
                     game_config['led_strobe_rate'] = max(50, min(2000, int(data['led_strobe_rate'])))
+                    print(f"💡 LED strobe: {old_value}ms → {game_config['led_strobe_rate']}ms")
                 
                 # Salvar no arquivo
-                save_game_config()
-                
-                response = {'success': True, 'message': 'Configurações salvas com sucesso!', 'config': game_config}
-                print(f"⚙️ Configurações atualizadas: {game_config}")
+                if save_game_config():
+                    response = {
+                        'success': True, 
+                        'message': 'Configurações salvas com sucesso!', 
+                        'config': game_config
+                    }
+                    print(f"✅ Configurações salvas com sucesso no arquivo {GAME_CONFIG_FILE}")
+                else:
+                    response = {
+                        'success': False, 
+                        'message': 'Erro ao salvar no arquivo', 
+                        'config': game_config
+                    }
+                    print(f"❌ Falha ao salvar configurações no arquivo")
                 
             except Exception as e:
-                response = {'success': False, 'message': f'Erro ao salvar configurações: {str(e)}'}
-                print(f"❌ Erro ao salvar configurações: {e}")
+                response = {'success': False, 'message': f'Erro ao processar configurações: {str(e)}'}
+                print(f"❌ Erro ao processar configurações: {e}")
             
             self.send_response(200)
             self.send_header('Content-Type', 'application/json')
@@ -822,14 +943,10 @@ class BikeJJHTTPHandler(http.server.BaseHTTPRequestHandler):
                 
                 print(f"📡 UDP Data recebido: {data['type']} - Jogador {data['player_id']}")
                 
-                # Aqui você pode adicionar lógica para enviar dados UDP para TouchDesigner
-                # Por enquanto, apenas logamos os dados
-                if data['type'] == 'winner':
-                    print(f"🏆 Vencedor detectado: Jogador {data['player_id']}")
-                elif data['type'] == 'reset':
-                    print("🔄 Reset do jogo detectado")
+                # Enviar mensagem UDP para o aparato
+                send_udp_message(data['type'], data['player_id'])
                 
-                response = {'success': True, 'message': 'Dados UDP processados'}
+                response = {'success': True, 'message': 'Dados UDP processados e enviados'}
                 
             except Exception as e:
                 response = {'success': False, 'message': f'Erro ao processar dados UDP: {str(e)}'}
@@ -846,6 +963,9 @@ class BikeJJHTTPHandler(http.server.BaseHTTPRequestHandler):
 
 def main():
     print("🚀 Iniciando servidor BikeJJ...")
+    
+    # Inicializar UDP
+    init_udp_socket()
     
     # Carregar configurações
     load_serial_config()
@@ -883,6 +1003,7 @@ def main():
     # Iniciar servidor HTTP
     with socketserver.TCPServer(("", HTTP_PORT), BikeJJHTTPHandler) as httpd:
         print(f"✅ Servidor HTTP rodando em http://localhost:{HTTP_PORT}")
+        print(f"📡 Servidor UDP ativo na porta {UDP_PORT}")
         print(f"🎮 Acesse o jogo em: http://localhost:{HTTP_PORT}")
         print(f"🔧 Configurador serial em: http://localhost:{HTTP_PORT}/serial_config.html")
         print("🛑 Pressione Ctrl+C para parar")
@@ -894,6 +1015,8 @@ def main():
             stop_decay_thread()  # Parar thread de decaimento
             if arduino_reader and arduino_reader.running:
                 arduino_reader.stop()
+            if udp_socket:
+                udp_socket.close()
 
 if __name__ == "__main__":
     main()
