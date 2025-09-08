@@ -1,14 +1,15 @@
 /*
  * BikeJJ - Sensores Hall Ultra Otimizados
  * J1: Pino 36 - Sensor Hall
- * J2: Pino 37 - Sensor Hall  
- * J3: Pino 38 - Sensor Hall
- * J4: Pino 39 - Sensor Hall
+ * J2: Pino 40 - Sensor Hall  
+ * J3: Pino 44 - Sensor Hall
+ * J4: Pino 48 - Sensor Hall
  * Performance máxima para sensores magnéticos
  */
 
-// Configurações dos sensores Hall - ULTRA OTIMIZADO
-const int HALL_PINS[4] = {36, 37, 38, 39}; // J1, J2, J3, J4
+// Configuração dos pinos dos jogadores
+const int PLAYER_PINS[] = {36, 40, 44, 48};
+const int NUM_PLAYERS = 4;
 const int DEBOUNCE_DELAY = 0; // ZERO debounce para máxima velocidade
 
 // Contadores para cada jogador
@@ -35,8 +36,8 @@ void setup() {
   Serial.begin(115200);
   
   // Configurar pinos dos sensores Hall para todos os jogadores
-  for (int i = 0; i < 4; i++) {
-    pinMode(HALL_PINS[i], INPUT_PULLUP);
+  for (int i = 0; i < NUM_PLAYERS; i++) {
+    pinMode(PLAYER_PINS[i], INPUT_PULLUP);
   }
   
   // Aguardar estabilização
@@ -48,10 +49,10 @@ void setup() {
 void loop() {
   unsigned long currentTime = millis();
   
-  // Processar todos os 4 jogadores
-  for (int player = 0; player < 4; player++) {
+  // Processar todos os jogadores
+  for (int player = 0; player < NUM_PLAYERS; player++) {
     // Ler estado do sensor Hall do jogador
-    int reading = digitalRead(HALL_PINS[player]);
+    int reading = digitalRead(PLAYER_PINS[player]);
     
     // Processamento ULTRA OTIMIZADO - ZERO debounce
     if (reading != currentState[player]) {
@@ -117,7 +118,7 @@ void loop() {
     lastSecondTime = currentTime;
     
     // Mostrar estatísticas para jogadores ativos
-    for (int player = 0; player < 4; player++) {
+    for (int player = 0; player < NUM_PLAYERS; player++) {
       if (pedalCount[player] > 0) {
         Serial.print("📈 J");
         Serial.print(player + 1);
