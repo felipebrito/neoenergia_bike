@@ -12,6 +12,7 @@ python start_bikejj.py
 ```
 
 **🎬 O script abre automaticamente:**
+- **NDI Screen Capture** para captura de tela
 - **Resolume Arena** no lado esquerdo da tela
 - **Chrome** no lado direito da tela (zoom 50%)
 - **Servidor BikeJJ** em background

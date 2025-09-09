@@ -139,6 +139,28 @@ def load_serial_config():
         print(f"❌ Erro ao carregar configuração: {e}")
     return None
 
+def open_ndi_screen_capture():
+    """Abrir NDI Screen Capture"""
+    ndi_path = r"C:\Program Files\NDI\NDI 6 Tools\Screen Capture\Application.Network.ScanConverter2.x64.exe"
+    
+    if not os.path.exists(ndi_path):
+        print("❌ NDI Screen Capture não encontrado em:", ndi_path)
+        return False
+    
+    try:
+        print("📡 Abrindo NDI Screen Capture...")
+        # Usar subprocess para abrir NDI Screen Capture
+        subprocess.Popen([ndi_path], shell=False)
+        
+        # Aguardar um pouco para o NDI inicializar
+        time.sleep(3)
+        print("✅ NDI Screen Capture iniciado!")
+        return True
+        
+    except Exception as e:
+        print(f"❌ Erro ao abrir NDI Screen Capture: {e}")
+        return False
+
 def open_resolume_arena():
     """Abrir Resolume Arena no lado esquerdo"""
     resolume_path = r"C:\Program Files\Resolume Arena\Arena.exe"
@@ -296,15 +318,19 @@ def main():
     print("⏳ Aguardando servidor ficar pronto...")
     time.sleep(3)
     
-    # 7. Abrir Resolume Arena (lado esquerdo)
+    # 7. Abrir NDI Screen Capture
+    print("\n📡 Abrindo NDI Screen Capture...")
+    open_ndi_screen_capture()
+    
+    # 8. Abrir Resolume Arena (lado esquerdo)
     print("\n🎬 Abrindo Resolume Arena...")
     open_resolume_arena()
     
-    # 8. Abrir Chrome (lado direito)
+    # 9. Abrir Chrome (lado direito)
     print("\n🌐 Abrindo interface do jogo...")
     open_chrome_with_layout()
     
-    # 9. Se Arduino não foi encontrado, abrir configurador
+    # 10. Se Arduino não foi encontrado, abrir configurador
     if not configured_port:
         print("\n🔧 Abrindo configurador serial...")
         time.sleep(2)
