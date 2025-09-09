@@ -179,7 +179,7 @@ def open_resolume_arena():
         # Aguardar um pouco para o Resolume inicializar
         time.sleep(2)
         
-        # Usar PowerShell para posicionar a janela no lado esquerdo e ativar primeira coluna
+        # Usar PowerShell para posicionar a janela no lado esquerdo
         ps_script = '''
         Add-Type -TypeDefinition @"
         using System;
@@ -200,15 +200,29 @@ def open_resolume_arena():
             [Win32]::SetWindowPos($arena, [IntPtr]::Zero, 0, 0, 960, 1080, 0x0040)
             [Win32]::SetForegroundWindow($arena)
             [Win32]::ShowWindow($arena, 9)
-            Start-Sleep -Milliseconds 500
-            # Enviar tecla F1 para ativar primeira coluna
-            Add-Type -AssemblyName System.Windows.Forms
-            [System.Windows.Forms.SendKeys]::SendWait("{F1}")
         }
         '''
         
         subprocess.run(['powershell', '-Command', ps_script], shell=True)
-        print("✅ Resolume Arena posicionado no lado esquerdo e primeira coluna ativada!")
+        print("✅ Resolume Arena posicionado no lado esquerdo!")
+        
+        # Aguardar um pouco para o Resolume estabilizar
+        time.sleep(3)
+        
+        # Enviar mensagem OSC para ativar primeira coluna
+        try:
+            import socket
+            osc_message = "/composition/columns/1/connect"
+            osc_data = osc_message.encode('utf-8')
+            
+            # Criar socket UDP
+            sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            sock.sendto(osc_data, ('127.0.0.1', 7000))
+            sock.close()
+            
+            print("✅ Mensagem OSC enviada: /composition/columns/1/connect na porta 7000")
+        except Exception as e:
+            print(f"⚠️ Erro ao enviar mensagem OSC: {e}")
         return True
         
     except Exception as e:
