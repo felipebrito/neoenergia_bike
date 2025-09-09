@@ -68,25 +68,27 @@ def get_available_ports():
         print(f"❌ Erro ao listar portas: {e}")
     return ports
 
-def test_arduino_connection(port, timeout=3):
+def test_arduino_connection(port, timeout=5):
     """Testar conexão com Arduino"""
     try:
         print(f"🔌 Testando conexão com {port}...")
         ser = serial.Serial(port, SERIAL_BAUDRATE, timeout=timeout)
-        time.sleep(2)  # Aguardar inicialização
+        time.sleep(3)  # Aguardar inicialização mais tempo
         
         # Tentar ler dados do Arduino
         data_received = False
         start_time = time.time()
+        attempts = 0
         
-        while time.time() - start_time < timeout:
+        while time.time() - start_time < timeout and attempts < 10:
             if ser.in_waiting > 0:
                 line = ser.readline().decode('utf-8', errors='ignore').strip()
-                if line and ('🔍' in line or '📊' in line or '📈' in line):
+                if line and ('🔍' in line or '📊' in line or '📈' in line or 'J1:' in line or 'J2:' in line or 'J3:' in line or 'J4:' in line):
                     data_received = True
                     print(f"✅ Arduino respondendo: {line[:50]}...")
                     break
-            time.sleep(0.1)
+            time.sleep(0.2)
+            attempts += 1
         
         ser.close()
         return data_received
@@ -333,17 +335,13 @@ def main():
     print("\n🌐 Abrindo interface do jogo...")
     open_chrome_with_layout()
     
-    # 10. Se Arduino não foi encontrado, abrir configurador
-    if not configured_port:
-        print("\n🔧 Abrindo configurador serial...")
-        time.sleep(2)
-        try:
-            if CHROME_PATH:
-                subprocess.Popen([CHROME_PATH, CONFIG_URL])
-            else:
-                webbrowser.open(CONFIG_URL)
-        except:
-            pass
+    # 10. Verificar status final da conexão
+    if configured_port:
+        print(f"\n✅ Arduino configurado na porta: {configured_port}")
+        print("🎯 Sistema pronto para receber mensagens do Arduino!")
+    else:
+        print("\n⚠️ Arduino não encontrado - sistema funcionará sem sensores")
+        print("💡 Para conectar Arduino, acesse: http://localhost:9000/serial_config.html")
     
     print("\n" + "=" * 60)
     print("✅ Sistema BikeJJ iniciado com sucesso!")
