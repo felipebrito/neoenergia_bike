@@ -401,13 +401,16 @@ class ArduinoMegaReader:
             self.serial_conn.close()
 
     def _read_serial(self):
+        print("🔄 Thread de leitura serial iniciada")
         while self.running:
             try:
                 # OTIMIZAÇÃO: Processar múltiplas linhas de uma vez
                 if self.serial_conn and self.serial_conn.in_waiting:
+                    print(f"📡 Dados disponíveis: {self.serial_conn.in_waiting} bytes")
                     while self.serial_conn.in_waiting > 0:
                         line = self.serial_conn.readline().decode('utf-8', errors='ignore').strip()
                         if line:
+                            print(f"📨 Linha recebida: {line}")
                             self._process_line(line)
                 time.sleep(0.001)  # Reduzido de 10ms para 1ms
             except Exception as e:

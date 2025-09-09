@@ -212,15 +212,32 @@ def open_resolume_arena():
         # Enviar mensagem OSC para ativar primeira coluna
         try:
             import socket
-            osc_message = "/composition/columns/1/connect"
-            osc_data = osc_message.encode('utf-8')
+            import struct
+            
+            # Comando OSC correto para Resolume: /composition/layers/1/clips/1/connect com valor 1
+            osc_address = "/composition/layers/1/clips/1/connect"
+            osc_value = 1  # 1 = conectar/play, 0 = desconectar/stop
+            
+            # Construir mensagem OSC
+            # Endereço + padding para múltiplo de 4
+            address_padded = (osc_address + '\x00' * (4 - (len(osc_address) % 4))).encode('utf-8')
+            
+            # Tipo de dados: ,i (integer)
+            type_tag = ",i"
+            type_tag_padded = (type_tag + '\x00' * (4 - (len(type_tag) % 4))).encode('utf-8')
+            
+            # Valor inteiro (4 bytes)
+            value_bytes = struct.pack('>i', osc_value)
+            
+            # Montar mensagem completa
+            osc_message = address_padded + type_tag_padded + value_bytes
             
             # Criar socket UDP
             sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            sock.sendto(osc_data, ('127.0.0.1', 7000))
+            sock.sendto(osc_message, ('127.0.0.1', 7000))
             sock.close()
             
-            print("✅ Mensagem OSC enviada: /composition/columns/1/connect na porta 7000")
+            print("✅ Mensagem OSC enviada: /composition/layers/1/clips/1/connect = 1 na porta 7000")
         except Exception as e:
             print(f"⚠️ Erro ao enviar mensagem OSC: {e}")
         return True
@@ -237,13 +254,13 @@ def open_chrome_with_layout():
         return
     
     try:
-        # Comando para abrir Chrome no lado direito com zoom 50%
+        # Comando para abrir Chrome no lado direito com zoom 75%
         cmd = [
             CHROME_PATH,
             '--new-window',
             '--window-position=960,0',  # Posição no lado direito
             '--window-size=960,1080',   # Tamanho da janela
-            '--force-device-scale-factor=0.5',  # Zoom 50%
+            '--force-device-scale-factor=0.75',  # Zoom 75%
             '--disable-web-security',
             '--disable-features=VizDisplayCompositor',
             GAME_URL
@@ -286,13 +303,104 @@ def start_server():
         print(f"❌ Erro ao iniciar servidor: {e}")
         return None
 
+def check_system_requirements():
+    """Verificar requisitos do sistema"""
+    print("🔍 Verificando requisitos do sistema...")
+    
+    # 1. Verificar Python
+    try:
+        import sys
+        python_version = sys.version_info
+        if python_version.major >= 3 and python_version.minor >= 8:
+            print(f"✅ Python {python_version.major}.{python_version.minor}.{python_version.micro} - OK")
+        else:
+            print(f"❌ Python {python_version.major}.{python_version.minor}.{python_version.micro} - Versão muito antiga!")
+            return False
+    except Exception as e:
+        print(f"❌ Erro ao verificar Python: {e}")
+        return False
+    
+    # 2. Verificar arquivos necessários
+    required_files = ['server.py', 'index.html', 'script.js', 'styles.css']
+    for file in required_files:
+        if os.path.exists(file):
+            print(f"✅ {file} - OK")
+        else:
+            print(f"❌ {file} - Não encontrado!")
+            return False
+    
+    # 3. Verificar portas disponíveis
+    try:
+        import socket
+        # Testar porta 9000
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        result = sock.connect_ex(('localhost', 9000))
+        sock.close()
+        if result == 0:
+            print("⚠️ Porta 9000 já está em uso - será necessário parar o processo")
+        else:
+            print("✅ Porta 9000 - Disponível")
+    except Exception as e:
+        print(f"❌ Erro ao verificar porta 9000: {e}")
+        return False
+    
+    # 4. Verificar Arduino
+    print("🔍 Verificando Arduino...")
+    arduino_found = False
+    ports = get_available_ports()
+    
+    if ports:
+        print(f"📡 {len(ports)} porta(s) encontrada(s):")
+        for port in ports:
+            print(f"   {port['device']} - {port['description']}")
+        
+        # Testar primeiro a porta configurada se existir
+        configured_port = load_serial_config()
+        if configured_port:
+            print(f"🔌 Testando primeiro a porta configurada: {configured_port}")
+            if test_arduino_connection(configured_port):
+                print(f"✅ Arduino funcionando em {configured_port}")
+                arduino_found = True
+            else:
+                print(f"❌ Arduino não responde em {configured_port}")
+                # Se não funcionar, testar outras portas
+                for port in ports:
+                    if port['device'] != configured_port:
+                        if test_arduino_connection(port['device']):
+                            print(f"✅ Arduino funcionando em {port['device']}")
+                            arduino_found = True
+                            break
+        else:
+            # Se não há porta configurada, testar todas
+            for port in ports:
+                if test_arduino_connection(port['device']):
+                    print(f"✅ Arduino funcionando em {port['device']}")
+                    arduino_found = True
+                    break
+    else:
+        print("❌ Nenhuma porta COM encontrada")
+    
+    if not arduino_found:
+        print("⚠️ Arduino não encontrado - sistema funcionará sem sensores")
+    
+    return True
+
 def main():
     """Função principal"""
     print("=" * 60)
     print("🚴 BikeJJ - Sistema de Inicialização Automática")
     print("=" * 60)
     
-    # 1. Verificar se estamos no diretório correto
+    # 1. Verificar requisitos do sistema
+    if not check_system_requirements():
+        print("❌ Verificação de requisitos falhou!")
+        input("Pressione Enter para sair...")
+        return
+    
+    print("\n✅ Todos os requisitos verificados!")
+    print("🚀 Iniciando sistema...")
+    
+    # 2. Verificar se estamos no diretório correto
     if not os.path.exists('server.py'):
         print("❌ Arquivo server.py não encontrado!")
         print("💡 Execute este script no diretório do projeto BikeJJ")
@@ -343,6 +451,11 @@ def main():
         input("Pressione Enter para sair...")
         return
     
+    # 5.1. Aguardar servidor conectar com Arduino
+    if configured_port:
+        print(f"⏳ Aguardando servidor conectar com Arduino em {configured_port}...")
+        time.sleep(5)  # Aguardar mais tempo para conectar
+    
     # 6. Aguardar servidor ficar pronto
     print("⏳ Aguardando servidor ficar pronto...")
     time.sleep(3)
@@ -359,7 +472,54 @@ def main():
     print("\n🌐 Abrindo interface do jogo...")
     open_chrome_with_layout()
     
-    # 10. Verificar status final da conexão
+    # 10. Aguardar estabilização e dar play na primeira coluna do Resolume
+    print("\n⏳ Aguardando estabilização do sistema...")
+    time.sleep(5)  # Aguardar 5 segundos para tudo estabilizar
+    
+    print("🎬 Ativando primeira coluna do Resolume Arena...")
+    try:
+        import socket
+        import struct
+        
+        # Comando OSC correto para Resolume: /composition/layers/1/clips/1/connect com valor 1
+        osc_address = "/composition/layers/1/clips/1/connect"
+        osc_value = 1  # 1 = conectar/play, 0 = desconectar/stop
+        
+        # Construir mensagem OSC
+        # Endereço + padding para múltiplo de 4
+        address_padded = (osc_address + '\x00' * (4 - (len(osc_address) % 4))).encode('utf-8')
+        
+        # Tipo de dados: ,i (integer)
+        type_tag = ",i"
+        type_tag_padded = (type_tag + '\x00' * (4 - (len(type_tag) % 4))).encode('utf-8')
+        
+        # Valor inteiro (4 bytes)
+        value_bytes = struct.pack('>i', osc_value)
+        
+        # Montar mensagem completa
+        osc_message = address_padded + type_tag_padded + value_bytes
+        
+        # Criar socket UDP
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        sock.sendto(osc_message, ('127.0.0.1', 7000))
+        sock.close()
+        
+        print("✅ Comando OSC enviado: /composition/layers/1/clips/1/connect = 1")
+        
+        # Aguardar um pouco e enviar comando de play novamente
+        time.sleep(2)
+        
+        # Enviar comando de play novamente para garantir
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        sock.sendto(osc_message, ('127.0.0.1', 7000))
+        sock.close()
+        
+        print("✅ Comando de play enviado para primeira coluna!")
+        
+    except Exception as e:
+        print(f"⚠️ Erro ao enviar comando OSC: {e}")
+    
+    # 11. Verificar status final da conexão
     if configured_port:
         print(f"\n✅ Arduino configurado na porta: {configured_port}")
         print("🎯 Sistema pronto para receber mensagens do Arduino!")
