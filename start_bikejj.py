@@ -236,21 +236,24 @@ def start_server():
     """Iniciar servidor BikeJJ"""
     try:
         print("🚀 Iniciando servidor BikeJJ...")
-        # Usar subprocess para manter o servidor rodando
+        # Usar subprocess para manter o servidor rodando em background
+        env = os.environ.copy()
+        env['PYTHONIOENCODING'] = 'utf-8'
+        
+        # Executar em background sem capturar stdout/stderr
         process = subprocess.Popen([sys.executable, 'server.py'], 
-                                 stdout=subprocess.PIPE, 
-                                 stderr=subprocess.PIPE,
-                                 text=True)
+                                 env=env,
+                                 creationflags=subprocess.CREATE_NEW_CONSOLE if os.name == 'nt' else 0)
         
         # Aguardar um pouco para o servidor inicializar
-        time.sleep(3)
+        time.sleep(2)
         
-        # Verificar se o servidor está rodando
+        # Verificar se o processo ainda está rodando
         if process.poll() is None:
             print("✅ Servidor iniciado com sucesso!")
             return process
         else:
-            print("❌ Erro ao iniciar servidor")
+            print("❌ Servidor falhou ao iniciar")
             return None
             
     except Exception as e:
@@ -347,16 +350,13 @@ def main():
     print("=" * 60)
     print("🎮 O jogo está rodando em: http://localhost:9000")
     print("🔧 Configurador serial: http://localhost:9000/serial_config.html")
-    print("\n💡 Para parar o servidor, feche esta janela ou pressione Ctrl+C")
+    print("\n✅ Sistema inicializado com sucesso!")
+    print("💡 O servidor está rodando em background")
     print("=" * 60)
     
-    try:
-        # Manter o servidor rodando
-        server_process.wait()
-    except KeyboardInterrupt:
-        print("\n🛑 Parando servidor...")
-        server_process.terminate()
-        print("✅ Servidor parado!")
+    # Aguardar um pouco para garantir que tudo foi iniciado
+    time.sleep(2)
+    print("🎯 Pronto para o evento!")
 
 if __name__ == "__main__":
     main()
