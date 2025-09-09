@@ -289,7 +289,9 @@ game_state = {
     'last_pedal_time': [0, 0, 0, 0],  # Timestamp da última pedalada para cada jogador
     'inactivity_timer': [0, 0, 0, 0],  # Timer de inatividade para cada jogador
     'players_ready': [False, False, False, False],  # NOVO: Jogadores que deram primeira pedalada
-    'game_can_start': False  # NOVO: Se todos os jogadores estão prontos
+    'game_can_start': False,  # NOVO: Se todos os jogadores estão prontos
+    'game_frozen': False,  # NOVO: Se o jogo está congelado (alguém venceu)
+    'winner_player': 0  # NOVO: Jogador que venceu (0 = ninguém)
 }
 
 # Timer para decaimento de energia (funciona independentemente do jogo)
@@ -304,6 +306,11 @@ def apply_energy_decay():
     # Verificar se é hora de aplicar decaimento
     if current_time - last_decay_time >= DECAY_INTERVAL:
         last_decay_time = current_time
+        
+        # Se o jogo está congelado, não aplicar decaimento
+        if game_state['game_frozen']:
+            print(f"🧊 Jogo congelado - Jogador {game_state['winner_player']} venceu! Decaimento pausado.")
+            return
         
         print(f"⏰ Aplicando decaimento de energia... (Taxa: {game_config['energy_decay_rate']}%/s)")
         
@@ -426,6 +433,11 @@ class ArduinoMegaReader:
         # CAPTURAR PEDALADAS POR JOGADOR (Arduino Mega) - FORMATO OTIMIZADO
         if "🔍 J" in line and ":" in line:
             try:
+                # Verificar se o jogo está congelado
+                if game_state['game_frozen']:
+                    print(f"🧊 Jogo congelado - Jogador {game_state['winner_player']} venceu! Pedaladas ignoradas.")
+                    return
+                
                 # Extrair número do jogador do formato otimizado "🔍 J1:5"
                 if "J1:" in line:
                     player_idx = 0
@@ -460,6 +472,11 @@ class ArduinoMegaReader:
                 # Verificar se ganhou
                 if game_state[energy_key] >= 100:
                     print(f"🏆 VITÓRIA! Jogador {player_idx + 1} atingiu 100% de energia!")
+                    # Congelar o jogo
+                    game_state['game_frozen'] = True
+                    game_state['winner_player'] = player_idx + 1
+                    game_state['game_active'] = False
+                    print(f"🧊 JOGO CONGELADO! Jogador {player_idx + 1} venceu!")
                     send_udp_message('winner', player_idx + 1)
             
             except Exception as e:
@@ -470,6 +487,11 @@ class ArduinoMegaReader:
         # CAPTURAR INTERRUPÇÕES DE SENSOR (mensagens principais do Arduino Mega)
         elif "🔍 Jogador" in line and "Pedalada #" in line:
             try:
+                # Verificar se o jogo está congelado
+                if game_state['game_frozen']:
+                    print(f"🧊 Jogo congelado - Jogador {game_state['winner_player']} venceu! Pedaladas ignoradas.")
+                    return
+                
                 # Extrair número do jogador e da pedalada
                 if "Jogador 1:" in line:
                     player_idx = 0
@@ -507,6 +529,16 @@ class ArduinoMegaReader:
                         energy_gain = game_config['energy_gain_rate']
                         game_state[energy_key] = min(100, game_state[energy_key] + energy_gain)
                         print(f"⚡ Jogador {player_idx + 1}: Energia incrementada para {game_state[energy_key]:.1f}% (+{energy_gain}%)")
+                        
+                        # Verificar se ganhou
+                        if game_state[energy_key] >= 100:
+                            print(f"🏆 VITÓRIA! Jogador {player_idx + 1} atingiu 100% de energia!")
+                            # Congelar o jogo
+                            game_state['game_frozen'] = True
+                            game_state['winner_player'] = player_idx + 1
+                            game_state['game_active'] = False
+                            print(f"🧊 JOGO CONGELADO! Jogador {player_idx + 1} venceu!")
+                            send_udp_message('winner', player_idx + 1)
                     
                     # Atualizar estado de pedalada
                     game_state['is_pedaling'][player_idx] = True
@@ -675,6 +707,8 @@ class BikeJJHTTPHandler(http.server.BaseHTTPRequestHandler):
         elif self.path == '/api/reset-game':
             # Resetar jogo
             game_state['game_active'] = False
+            game_state['game_frozen'] = False  # Descongelar o jogo
+            game_state['winner_player'] = 0  # Resetar vencedor
             # Resetar energia de todos os jogadores
             for i in range(4):
                 game_state[f'player{i+1}_energy'] = 0
@@ -689,7 +723,7 @@ class BikeJJHTTPHandler(http.server.BaseHTTPRequestHandler):
             # Enviar mensagem de reset via UDP
             send_udp_message('reset', 0)
             
-            print("🔄 Jogo resetado para 4 jogadores")
+            print("🔄 Jogo resetado e descongelado para 4 jogadores")
             self.send_response(200)
             self.end_headers()
             self.wfile.write(b"OK")
@@ -831,6 +865,16 @@ class BikeJJHTTPHandler(http.server.BaseHTTPRequestHandler):
         if self.path == '/api/pedal':
             # Endpoint para simular pedaladas via teclado
             try:
+                # Verificar se o jogo está congelado
+                if game_state['game_frozen']:
+                    print(f"🧊 Jogo congelado - Jogador {game_state['winner_player']} venceu! Pedaladas via teclado ignoradas.")
+                    self.send_response(200)
+                    self.send_header('Content-Type', 'application/json')
+                    self.end_headers()
+                    response = {'success': False, 'message': f'Jogo congelado - Jogador {game_state["winner_player"]} venceu!'}
+                    self.wfile.write(json.dumps(response).encode())
+                    return
+                
                 content_length = int(self.headers['Content-Length'])
                 post_data = self.rfile.read(content_length)
                 data = json.loads(post_data.decode('utf-8'))
@@ -852,20 +896,14 @@ class BikeJJHTTPHandler(http.server.BaseHTTPRequestHandler):
                     # Verificar vitória
                     if game_state[energy_key] >= 100:
                         print(f"🏆 VITÓRIA! Jogador {player_id} chegou a 100% de energia!")
+                        # Congelar o jogo
+                        game_state['game_frozen'] = True
+                        game_state['winner_player'] = player_id
                         game_state['game_active'] = False
+                        print(f"🧊 JOGO CONGELADO! Jogador {player_id} venceu!")
                         
                         # Enviar mensagem de vitória via UDP
                         send_udp_message('winner', player_id)
-                        
-                        # Resetar energia de todos os jogadores
-                        for i in range(4):
-                            game_state[f'player{i+1}_energy'] = 0
-                            game_state['pedal_count'][i] = 0
-                            game_state['is_pedaling'][i] = False
-                            game_state['last_pedal_time'][i] = 0
-                            game_state['players_ready'][i] = False
-                        game_state['game_can_start'] = False
-                        print("🔄 Jogo resetado após vitória!")
                     
                     self.send_response(200)
                     self.send_header('Content-Type', 'application/json')
