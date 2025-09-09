@@ -139,6 +139,48 @@ def load_serial_config():
         print(f"❌ Erro ao carregar configuração: {e}")
     return None
 
+def open_resolume_arena():
+    """Abrir Resolume Arena no lado esquerdo"""
+    resolume_path = r"C:\Program Files\Resolume Arena\Arena.exe"
+    
+    if not os.path.exists(resolume_path):
+        print("❌ Resolume Arena não encontrado em:", resolume_path)
+        return False
+    
+    try:
+        print("🎬 Abrindo Resolume Arena no lado esquerdo...")
+        # Usar subprocess para abrir Resolume Arena
+        subprocess.Popen([resolume_path], shell=False)
+        
+        # Aguardar um pouco para o Resolume inicializar
+        time.sleep(2)
+        
+        # Usar PowerShell para posicionar a janela no lado esquerdo
+        ps_script = '''
+        Add-Type -TypeDefinition @"
+        using System;
+        using System.Runtime.InteropServices;
+        public class Win32 {
+            [DllImport("user32.dll")]
+            public static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags);
+            [DllImport("user32.dll")]
+            public static extern IntPtr FindWindow(string lpClassName, string lpWindowName);
+        }
+"@
+        $arena = [Win32]::FindWindow($null, "Arena")
+        if ($arena -ne [IntPtr]::Zero) {
+            [Win32]::SetWindowPos($arena, [IntPtr]::Zero, 0, 0, 960, 1080, 0x0040)
+        }
+        '''
+        
+        subprocess.run(['powershell', '-Command', ps_script], shell=True)
+        print("✅ Resolume Arena posicionado no lado esquerdo!")
+        return True
+        
+    except Exception as e:
+        print(f"❌ Erro ao abrir Resolume Arena: {e}")
+        return False
+
 def open_chrome_with_layout():
     """Abrir Chrome com layout específico (lado direito, zoom 50%)"""
     if not CHROME_PATH:
@@ -159,7 +201,7 @@ def open_chrome_with_layout():
             GAME_URL
         ]
         
-        print("🌐 Abrindo Chrome com layout otimizado...")
+        print("🌐 Abrindo Chrome no lado direito...")
         subprocess.Popen(cmd, shell=False)
         print("✅ Chrome aberto com sucesso!")
         
@@ -254,11 +296,15 @@ def main():
     print("⏳ Aguardando servidor ficar pronto...")
     time.sleep(3)
     
-    # 7. Abrir Chrome
+    # 7. Abrir Resolume Arena (lado esquerdo)
+    print("\n🎬 Abrindo Resolume Arena...")
+    open_resolume_arena()
+    
+    # 8. Abrir Chrome (lado direito)
     print("\n🌐 Abrindo interface do jogo...")
     open_chrome_with_layout()
     
-    # 8. Se Arduino não foi encontrado, abrir configurador
+    # 9. Se Arduino não foi encontrado, abrir configurador
     if not configured_port:
         print("\n🔧 Abrindo configurador serial...")
         time.sleep(2)
