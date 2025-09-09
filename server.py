@@ -371,19 +371,20 @@ def decay_worker():
             time.sleep(1)
 
 class ArduinoMegaReader:
-    def __init__(self):
+    def __init__(self, port=None):
+        self.port = port or SERIAL_PORT
         self.serial_conn = None
         self.running = False
 
     def start(self):
-        if not SERIAL_PORT:
+        if not self.port:
             print("⚠️ Nenhuma porta serial configurada")
             return False
             
         try:
-            self.serial_conn = serial.Serial(SERIAL_PORT, SERIAL_BAUDRATE, timeout=1)
+            self.serial_conn = serial.Serial(self.port, SERIAL_BAUDRATE, timeout=1)
             self.running = True
-            print(f"📡 Conectado ao Arduino Mega na porta {SERIAL_PORT}")
+            print(f"📡 Conectado ao Arduino Mega na porta {self.port}")
 
             # Thread de leitura serial
             self.read_thread = threading.Thread(target=self._read_serial, daemon=True)
@@ -1000,30 +1001,59 @@ def main():
     load_serial_config()
     load_game_config()
     
-    # NÃO iniciar leitor Arduino Mega automaticamente
-    # Deixar o usuário configurar via interface
+    # Conectar automaticamente no Arduino
     if SERIAL_PORT:
         print(f"📁 Porta configurada: {SERIAL_PORT}")
-        print("💡 Use o configurador serial para conectar")
+        print("🔌 Conectando automaticamente no Arduino...")
+        
+        # Tentar conectar automaticamente
+        try:
+            global arduino_reader
+            arduino_reader = ArduinoMegaReader(SERIAL_PORT)
+            arduino_reader.start()
+            print("✅ Arduino conectado e funcionando!")
+        except Exception as e:
+            print(f"❌ Erro ao conectar no Arduino: {e}")
+            print("🔄 Tentando detectar Arduino automaticamente...")
+            
+            # Tentar detectar Arduino automaticamente
+            from serial.tools import list_ports
+            ports = list_ports.comports()
+            
+            for port in ports:
+                try:
+                    print(f"🔍 Testando porta: {port.device}")
+                    test_reader = ArduinoMegaReader(port.device)
+                    test_reader.start()
+                    arduino_reader = test_reader
+                    print(f"✅ Arduino encontrado e conectado em: {port.device}")
+                    break
+                except Exception as test_e:
+                    print(f"❌ Falha em {port.device}: {test_e}")
+                    continue
+            else:
+                print("⚠️ Arduino não encontrado - sistema funcionará sem sensores")
     else:
         print("⚠️ Nenhuma porta serial configurada")
-        print("💡 Use o configurador serial para configurar")
-    
-    print("🔧 IMPORTANTE: Configure a porta serial antes de iniciar o jogo!")
-    
-    # Mensagem específica para Windows
-    if platform.system() == 'Windows':
-        print("💻 Windows detectado!")
-        print("🔌 Portas COM disponíveis: COM3, COM4, COM5, etc.")
-        print("📱 Conecte o Arduino Mega via USB")
-        print("🌐 Abra: http://localhost:9000/serial_config.html")
-        print("⚙️ Selecione a porta COM correta e clique em 'Conectar'")
-    else:
-        print("🍎 macOS/Linux detectado!")
-        print("🔌 Portas disponíveis: /dev/cu.usbserial-*, /dev/ttyUSB*")
-        print("📱 Conecte o Arduino Mega via USB")
-        print("🌐 Abra: http://localhost:9000/serial_config.html")
-        print("⚙️ Selecione a porta correta e clique em 'Conectar'")
+        print("🔄 Tentando detectar Arduino automaticamente...")
+        
+        # Tentar detectar Arduino automaticamente
+        from serial.tools import list_ports
+        ports = list_ports.comports()
+        
+        for port in ports:
+            try:
+                print(f"🔍 Testando porta: {port.device}")
+                test_reader = ArduinoMegaReader(port.device)
+                test_reader.start()
+                arduino_reader = test_reader
+                print(f"✅ Arduino encontrado e conectado em: {port.device}")
+                break
+            except Exception as test_e:
+                print(f"❌ Falha em {port.device}: {test_e}")
+                continue
+        else:
+            print("⚠️ Arduino não encontrado - sistema funcionará sem sensores")
     
     # INICIAR THREAD DE DECAIMENTO INDEPENDENTE
     print("⏰ Iniciando sistema de decaimento de energia...")
