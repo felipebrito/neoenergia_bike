@@ -1024,12 +1024,14 @@ def main():
                 try:
                     print(f"🔍 Testando porta: {port.device}")
                     test_reader = ArduinoMegaReader(port.device)
-                    test_reader.start()
-                    arduino_reader = test_reader
-                    print(f"✅ Arduino encontrado e conectado em: {port.device}")
-                    break
+                    if test_reader.start():
+                        arduino_reader = test_reader
+                        print(f"✅ Arduino encontrado e conectado em: {port.device}")
+                        break
+                    else:
+                        print(f"❌ Falha ao conectar em {port.device}")
                 except Exception as test_e:
-                    print(f"❌ Falha em {port.device}: {test_e}")
+                    print(f"❌ Erro em {port.device}: {test_e}")
                     continue
             else:
                 print("⚠️ Arduino não encontrado - sistema funcionará sem sensores")
@@ -1045,12 +1047,14 @@ def main():
             try:
                 print(f"🔍 Testando porta: {port.device}")
                 test_reader = ArduinoMegaReader(port.device)
-                test_reader.start()
-                arduino_reader = test_reader
-                print(f"✅ Arduino encontrado e conectado em: {port.device}")
-                break
+                if test_reader.start():
+                    arduino_reader = test_reader
+                    print(f"✅ Arduino encontrado e conectado em: {port.device}")
+                    break
+                else:
+                    print(f"❌ Falha ao conectar em {port.device}")
             except Exception as test_e:
-                print(f"❌ Falha em {port.device}: {test_e}")
+                print(f"❌ Erro em {port.device}: {test_e}")
                 continue
         else:
             print("⚠️ Arduino não encontrado - sistema funcionará sem sensores")
